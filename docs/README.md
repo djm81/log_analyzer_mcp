@@ -79,15 +79,15 @@ Chroma MCP Server is licensed under the MIT License with Commons Clause. This me
 
 ✅ **Allowed**:
 
-- Use Chroma MCP Server for any purpose (personal, commercial, academic)
+- Use Log Analyzer MCP for any purpose (personal, commercial, academic)
 - Modify the code
 - Distribute copies
-- Create and sell products built using Chroma MCP Server
+- Create and sell products built using Log Analyzer MCP
 
 ❌ **Not Allowed**:
 
-- Sell Chroma MCP Server itself
-- Offer Chroma MCP Server as a hosted service
-- Create competing products based on Chroma MCP Server
+- Sell Log Analyzer MCP itself
+- Offer Log Analyzer MCP as a hosted service
+- Create competing products based on Log Analyzer MCP
 
 See the [LICENSE.md](LICENSE.md) file for the complete license text.
