@@ -1,0 +1,46 @@
+# Coverage files
+!.coveragerc
+.coverage
+.coverage.*
+coverage.xml
+coverage_html_report/
+htmlcov/
+tests/.coverage
+tests/coverage.xml
+tests/coverage_html_report/
+tests/htmlcov/
+
+# Python cache files
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+*.py.bak
+
+# Virtual environment
+venv/
+.venv/
+
+# Log files
+logs/
+!logs/.gitkeep
+test_logs/
+
+# Environment files
+.env
+.env.*
+!.env.template
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Dependencies
+latest_requirements.txt 

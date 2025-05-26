@@ -1,0 +1,299 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "log_analyzer_mcp"
+version = "0.1.1"
+description = "MCP server and tools for analyzing test and runtime logs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE.md" } # Refer to LICENSE.md for combined license
+authors = [
+    {name = "Dominikus Nold (Nold Coaching & Consulting)", email = "info@noldcoaching.de"}
+]
+keywords = ["mcp", "log-analysis", "testing", "coverage", "runtime-errors", "development-tools"]
+classifiers = [
+    "Development Status :: 4 - Beta", # Assuming Beta, adjust as needed
+    "Intended Audience :: Developers",
+    # "License :: OSI Approved :: MIT License", # Removed as Commons Clause makes it non-OSI MIT
+    "License :: Other/Proprietary License", # Indicate a custom/specific license found in LICENSE.md
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: System :: Logging"
+]
+dependencies = [
+    # Core dependencies
+    "pydantic>=2.10.6",
+    "python-dotenv>=1.0.1",
+    "requests>=2.32.3",
+    "typing-extensions>=4.12.2",
+    "PyYAML>=6.0.1",
+    "types-PyYAML>=6.0.12", # Keep this specific version for now
+    
+    # Structured output dependencies
+    "jsonschema>=4.23.0",
+    "pydantic-core>=2.27.2",
+    
+    # Utility dependencies
+    "tenacity>=9.0.0",
+    "rich>=13.9.4",
+    
+    # Logging and monitoring
+    "loguru>=0.7.3",
+    
+    # MCP Server SDK
+    "mcp>=1.4.1", # Keep existing version
+    
+    # Environment/Utils
+    "python-dateutil>=2.9.0.post0",
+    "pytz>=2025.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-cov",
+    "pytest-mock>=3.14.0",
+    "mypy>=1.15.0",
+    "black>=25.1.0",
+    "isort>=6.0.1",
+    "pylint>=3.3.6",
+    "types-PyYAML>=6.0.12.20250402",
+]
+
+# Add other optional dependency groups from your original if they existed and are still needed (e.g., server, client, devtools, full from tpl)
+
+[project.urls]
+Homepage = "https://github.com/nold-ai/log_analyzer_mcp" # Placeholder, update if needed
+Repository = "https://github.com/nold-ai/log_analyzer_mcp.git" # Placeholder
+Documentation = "https://github.com/nold-ai/log_analyzer_mcp#readme" # Placeholder, assuming it points to root README
+
+# [project.scripts] # Add if your project has CLI scripts
+# my-script = "log_analyzer_mcp.cli:main"
+
+# [project.entry-points."pytest11"] # Add if you have pytest plugins
+# log_analyzer_mcp_plugin = "log_analyzer_mcp.pytest_plugin"
+
+[tool.hatch.envs.default]
+# features = [] # Add features if you have defined more optional-dependencies groups like 'server', 'client'
+dependencies = [
+  # Add any default development/testing dependencies here not covered by 'dev' extras if needed
+  "coverage[toml]>=7.8.0" # Added for coverage reporting scripts
+]
+
+[tool.hatch.envs.default.scripts]
+_cov = [
+  "coverage run -m pytest --timeout=60 -p no:xdist --junitxml=logs/tests/junit/test-results.xml {args}",
+  "coverage combine --rcfile=pyproject.toml",
+]
+# cov = "coverage report --rcfile=pyproject.toml -m {args}"
+# Reverted to simpler default cov command to avoid complex arg parsing for now
+cov = "coverage report -m {args}"
+# run = "python -m pytest --timeout=60 -p no:xdist --junitxml=logs/tests/junit/test-results.xml {args}"
+run = "pytest --timeout=60 -p no:xdist --junitxml=logs/tests/junit/test-results.xml {args}"
+run-cov = "hatch run _cov {args}"
+xml = "coverage xml -o logs/tests/coverage/coverage.xml {args}"
+run-html = "coverage html -d logs/tests/coverage/htmlcov {args}"
+cov-report = [
+    "hatch run cov",
+    "hatch run xml",
+    "hatch run run-html",
+]
+start-dev-server = "python src/log_analyzer_mcp/log_analyzer_mcp_server.py"
+
+[tool.hatch.envs.hatch-test]
+dependencies = [
+  "pytest>=8.3.5", # Keep your project's pytest version
+  "pytest-mock>=3.14.0", # Keep your project's version
+  # "trio>=0.29.0", # Add if you use trio for async tests
+  # "pytest-trio>=0.8.0", # Add if you use trio for async tests
+  "pytest-asyncio>=0.26.0", # For handling async def tests, if you have them
+  "coverage[toml]>=7.8.0",
+  # "GitPython>=3.1.44", # Add if needed for tests
+  "pytest-timeout>=2.3.1", # Add pytest-timeout plugin
+]
+dev-mode = true
+
+[tool.hatch.envs.hatch-test.env-vars]
+TOKENIZERS_PARALLELISM = "false"
+PYTEST_TIMEOUT = "180"
+
+[tool.hatch.envs.hatch-test.scripts]
+# Script executed by `hatch test`
+run = "pytest -v {env:HATCH_TEST_ARGS:} {args}"
+
+# Script executed by `hatch test --cover`
+run-cov = "coverage run -m pytest -v {env:HATCH_TEST_ARGS:} {args}"
+
+# Script run after all tests complete when measuring coverage
+cov-combine = "coverage combine"
+
+# Script run to show coverage report when not using --cover-quiet
+cov-report = "coverage report -m"
+
+# Keep other utility scripts if they were meant for `hatch run hatch-test:<script_name>`
+# Script to only generate the XML coverage report (assumes .coverage file exists)
+xml = "coverage xml -o {env:COVERAGE_XML_FILE:logs/tests/coverage/coverage.xml}"
+
+# Script to only generate the HTML coverage report (assumes .coverage file exists)
+run-html = "coverage html -d {env:COVERAGE_HTML_DIR:logs/tests/coverage/html}"
+
+# # Script to only generate the text coverage summary (assumes .coverage file exists) # This is covered by cov-report = "coverage report -m"
+# cov-report = "coverage report -m" # Already defined above as per hatch defaults
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.10","3.11","3.12"] # Your project requires >=3.10
+
+[tool.coverage.run]
+branch = true
+parallel = true
+sigterm = true
+source = ["src/"]
+relative_files = true
+data_file = "logs/tests/coverage/.coverage"
+omit = [
+    "*/tests/*",
+    "src/**/__init__.py",
+    "src/**/__main__.py"
+]
+
+[tool.coverage.paths]
+source = ["src/"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:", # Note the dot before __main__
+    "if TYPE_CHECKING:",
+    "pass",
+    "raise AssertionError",
+    "@abstractmethod",
+    "except ImportError:", # Often used for optional imports
+    "except Exception:", # Too broad, consider more specific exceptions
+]
+show_missing = true
+
+[tool.coverage.html]
+directory = "logs/tests/coverage/html"
+
+[tool.coverage.xml]
+output = "logs/tests/coverage/coverage.xml"
+
+[tool.pytest-asyncio] # Add if you use asyncio tests
+mode = "strict"
+
+[tool.hatch.build]
+dev-mode-dirs = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/log_analyzer_mcp"
+]
+
+# [tool.hatch.envs.default.env-vars] # Add if you have default env vars for hatch environments
+# MY_VAR = "value"
+
+[tool.black]
+line-length = 120
+target-version = ["py312"] # From your original config
+include = '''\.pyi?$''' # From template
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  # Add project-specific excludes if any
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3 
+line_length = 120 # From your original config
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+# Add namespace_packages = true if you use them extensively and mypy has issues
+# exclude = [] # Add patterns for files/directories to exclude from mypy checks
+
+[tool.pytest.ini_options]
+minversion = "8.3.5" # From template, your current pytest is also 8.3.5
+addopts = "-ra -q --showlocals --strict-markers --strict-config"
+pythonpath = [
+    "src"
+]
+testpaths = "tests"
+python_files = "test_*.py *_test.py tests.py"
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "asyncio: mark test as async",
+    # Add other custom markers
+]
+asyncio_mode = "strict"
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:tensorboard",
+    "ignore::DeprecationWarning:tensorflow",
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore::DeprecationWarning:google.protobuf",
+    "ignore::DeprecationWarning:keras",
+    "ignore::UserWarning:torchvision.io.image",
+    # Ignore pytest-asyncio default loop scope warning for now
+    "ignore:The configuration option \"asyncio_default_fixture_loop_scope\" is unset.:pytest.PytestDeprecationWarning"
+]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+timeout = 60.0 # Increased from 5.0 to 60.0 seconds
+junit_family = "xunit2"
+
+[tool.pylint.messages_control]
+disable = [
+    "C0111",  # missing-docstring (missing-module-docstring, missing-class-docstring, missing-function-docstring)
+    "C0103",  # invalid-name
+    "C0330",  # bad-continuation (often conflicts with black)
+    "C0326",  # bad-whitespace (often conflicts with black)
+    "R0903",  # too-few-public-methods
+    "R0913",  # too-many-arguments
+    "W0511",  # fixme
+]
+
+[tool.pylint.format]
+max-line-length = 120
+
+# Add this if you plan to use hatch version command
+[tool.hatch.version]
+path = "src/log_analyzer_mcp/__init__.py"
+
+# Add build hook configuration if needed, for example:
+# [tool.hatch.build.hooks.custom]
+# path = "hatch_hooks.py" # A custom script for build hooks 

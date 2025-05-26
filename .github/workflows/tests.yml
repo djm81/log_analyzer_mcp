@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+# yamllint disable rule:line-length rule:truthy
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '**.mdc'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '**.mdc'
+  workflow_dispatch:
+    # Allows manual triggering from the Actions tab
+
+jobs:
+  test:
+    permissions:
+      contents: read
+      pull-requests: write    
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12 
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12' # Use a specific version, e.g., the latest
+
+    # - name: Clean up runner disk space manually
+    #   run: |
+    #     echo "Initial disk space:"
+    #     df -h
+    #     sudo rm -rf /usr/share/dotnet || echo ".NET removal failed, continuing..."
+    #     sudo rm -rf /usr/local/lib/android || echo "Android removal failed, continuing..."
+    #     sudo rm -rf /opt/ghc || echo "Haskell removal failed, continuing..."
+    #     # Add || true or echo to commands to prevent workflow failure if dir doesn't exist
+    #     sudo apt-get clean
+    #     echo "Disk space after cleanup:"
+    #     df -h
+
+    - name: Install hatch and coverage
+      run: |
+        python -m pip install --upgrade pip --no-cache-dir
+        pip install hatch coverage --no-cache-dir
+    
+    - name: Create test output directories
+      run: |
+        mkdir -p logs/tests/junit logs/tests/coverage logs/tests/workflows
+    
+    - name: Run tests with coverage run
+      # Run tests using 'coverage run' managed by hatch environment
+      # Pass arguments like timeout/no-xdist directly to pytest
+      run: hatch test --cover -v tests/
+    
+    - name: Combine coverage data (if needed)
+      # Important if tests were run in parallel, harmless otherwise
+      run: hatch run coverage combine || true
+    
+    - name: Generate coverage XML report
+      # Use hatch to run coverage in the correct environment
+      run: hatch run coverage xml -o logs/tests/coverage/coverage.xml
+    
+    - name: Generate coverage report summary
+      # Display summary in the logs
+      run: hatch run coverage report -m
+    
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # nosec - linter-ignore-for-missing-secrets
+        file: ./logs/tests/coverage/coverage.xml # Updated path to coverage report
+        fail_ci_if_error: true 

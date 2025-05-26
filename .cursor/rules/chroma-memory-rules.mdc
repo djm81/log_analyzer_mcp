@@ -1,0 +1,47 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Context lookup from previous conversations in memory
+
+1. Remember, you have access to Chroma tools through the MCP interface.
+2. At any point if the user references previous chats or memory, check chroma for similar conversations using `mcp_chroma_query_documents`.
+3. Try to use retrieved information where possible.
+
+# Context persistence from current conversation to memory
+
+1. Break down our conversation into small, self-contained chunks before storing in Chroma.
+
+   - Each chunk should be a complete thought or concept
+   - Include relevant context within each chunk
+   - Keep chunks under the embedding model's token limit
+
+2. Store chunks using the simplified MCP interface:
+
+   ```python
+   mcp_chroma_add_documents(
+       collection_name="collection_name",
+       documents=["chunk1", "chunk2", ...]
+   )
+   ```
+
+3. When storing conversations:
+
+   - Include timestamp and context in the document text
+   - Format: "[TIMESTAMP] [CONTEXT] Content..."
+   - Example: "2024-03-25 [CODING_FACTORY] Discussion about ChromaDB integration..."
+
+4. For retrieving context:
+
+   - Use `mcp_chroma_query_documents` with specific search terms
+   - Include relevant context in your query
+   - Example: searching for "ChromaDB integration issues"
+
+5. Automatically persist:
+
+   - Key decisions and solutions
+   - Important code changes and their rationale
+   - Debugging insights and fixes
+   - Architecture and design decisions
+   - Common issues and their resolutions
