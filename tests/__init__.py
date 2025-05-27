@@ -1,2 +1,2 @@
 # This file makes Python treat the directory tests as a package.
-# It can be empty. 
+# It can be empty.

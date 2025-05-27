@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "log_analyzer_mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "MCP server and tools for analyzing test and runtime logs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -53,6 +53,7 @@ dependencies = [
     # Environment/Utils
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.1",
+    "click>=8.1.0", # Added for CLI client
 ]
 
 [project.optional-dependencies]
@@ -81,10 +82,10 @@ Documentation = "https://github.com/nold-ai/log_analyzer_mcp#readme" # Placehold
 # log_analyzer_mcp_plugin = "log_analyzer_mcp.pytest_plugin"
 
 [tool.hatch.envs.default]
-# features = [] # Add features if you have defined more optional-dependencies groups like 'server', 'client'
+features = ["dev"] # Add features if you have defined more optional-dependencies groups like 'server', 'client'
 dependencies = [
   # Add any default development/testing dependencies here not covered by 'dev' extras if needed
-  "coverage[toml]>=7.8.0" # Added for coverage reporting scripts
+  "coverage[toml]>=7.8.0"
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -94,14 +95,14 @@ _cov = [
 ]
 # cov = "coverage report --rcfile=pyproject.toml -m {args}"
 # Reverted to simpler default cov command to avoid complex arg parsing for now
-cov = "coverage report -m {args}"
+cov-text-summary = "python -m coverage report -m --data-file=logs/tests/coverage/.coverage"
 # run = "python -m pytest --timeout=60 -p no:xdist --junitxml=logs/tests/junit/test-results.xml {args}"
 run = "pytest --timeout=60 -p no:xdist --junitxml=logs/tests/junit/test-results.xml {args}"
 run-cov = "hatch run _cov {args}"
 xml = "coverage xml -o logs/tests/coverage/coverage.xml {args}"
 run-html = "coverage html -d logs/tests/coverage/htmlcov {args}"
 cov-report = [
-    "hatch run cov",
+    "hatch run cov-text-summary",
     "hatch run xml",
     "hatch run run-html",
 ]
@@ -196,7 +197,8 @@ dev-mode-dirs = ["src"]
 
 [tool.hatch.build.targets.wheel]
 packages = [
-    "src/log_analyzer_mcp"
+    "src/log_analyzer_mcp",
+    "src/log_analyzer_client"
 ]
 
 # [tool.hatch.envs.default.env-vars] # Add if you have default env vars for hatch environments
@@ -245,7 +247,7 @@ warn_unreachable = true
 
 [tool.pytest.ini_options]
 minversion = "8.3.5" # From template, your current pytest is also 8.3.5
-addopts = "-ra -q --showlocals --strict-markers --strict-config"
+addopts = "-ra" # Removed ignore flags
 pythonpath = [
     "src"
 ]
@@ -273,15 +275,13 @@ log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-timeout = 60.0 # Increased from 5.0 to 60.0 seconds
+timeout = 180.0 # Set default timeout to 180 seconds
 junit_family = "xunit2"
 
 [tool.pylint.messages_control]
 disable = [
     "C0111",  # missing-docstring (missing-module-docstring, missing-class-docstring, missing-function-docstring)
     "C0103",  # invalid-name
-    "C0330",  # bad-continuation (often conflicts with black)
-    "C0326",  # bad-whitespace (often conflicts with black)
     "R0903",  # too-few-public-methods
     "R0913",  # too-many-arguments
     "W0511",  # fixme

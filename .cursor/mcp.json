@@ -10,6 +10,9 @@
         "MCP_LOG_LEVEL": "DEBUG",
         "MCP_LOG_FILE": "/Users/dominikus/git/nold-ai/log_analyzer_mcp/logs/mcp/log_analyzer_mcp_server.log"
       }
+    },
+    "FastMCP Docs": {
+      "url": "https://gitmcp.io/jlowin/fastmcp"
     }
   }
 } 

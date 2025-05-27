@@ -179,9 +179,9 @@ rm -rf "$DIST_DIR" "$BUILD_DIR" $EGG_INFO_DIR
 echo "Formatting code with Black via Hatch (from project root)..."
 (cd "$PROJECT_ROOT" && hatch run black .)
 
-# Build the package using project root context
-echo "Building package with Hatch (from project root)..."
-(cd "$PROJECT_ROOT" && hatch build)
+# Build the package using the dedicated build.sh script
+echo "Building package via scripts/build.sh (from project root)..."
+(cd "$PROJECT_ROOT" && ./scripts/build.sh)
 
 # Check if build was successful
 if [ ! -d "$DIST_DIR" ]; then
