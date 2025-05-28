@@ -45,7 +45,7 @@ To integrate the Log Analyzer MCP server with a client application (like Cursor)
 
 **Example Client Configuration (e.g., in `.cursor/mcp.json`):**
 
-```json
+```jsonc
 {
   "mcpServers": {
     "log_analyzer_mcp_server_prod": {

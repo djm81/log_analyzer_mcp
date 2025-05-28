@@ -171,7 +171,7 @@ The `.cursor/mcp.json` file defines configurations for running the MCP server in
 - **Purpose:** For testing the packaged version of the server, usually installed from TestPyPI. This helps verify that packaging, dependencies, and entry points work correctly.
 - **Configuration (`.cursor/mcp.json` snippet):**
 
-    ```json
+    ```jsonc
     "log_analyzer_mcp_server_test": {
       "command": "uvx", // uvx is a tool to run python executables from venvs
       "args": [
@@ -195,7 +195,7 @@ The `.cursor/mcp.json` file defines configurations for running the MCP server in
 - **Purpose:** For running the stable, released version of the MCP server, typically installed from PyPI.
 - **Configuration (`.cursor/mcp.json` snippet):**
 
-    ```json
+    ```jsonc
     "log_analyzer_mcp_server_prod": {
       "command": "uvx",
       "args": [
