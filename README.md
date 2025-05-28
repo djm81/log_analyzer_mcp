@@ -4,93 +4,89 @@
 [![codecov](https://codecov.io/gh/djm81/log_analyzer_mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/djm81/log_analyzer_mcp)
 [![PyPI - Version](https://img.shields.io/pypi/v/log-analyzer-mcp?color=blue)](https://pypi.org/project/log-analyzer-mcp)
 
-## Overview
+## Overview: Analyze Logs with Ease
 
-**Log Analyzer MCP** is a specialized Model-Context-Protocol (MCP) server designed to integrate with Cursor. It provides tools for analyzing test logs, runtime errors, and code coverage reports, streamlining the development and debugging workflow.
+**Log Analyzer MCP** is a powerful Python-based toolkit designed to streamline the way you interact with log files. Whether you're debugging complex applications, monitoring test runs, or simply trying to make sense of verbose log outputs, this tool provides both a Command-Line Interface (CLI) and a Model-Context-Protocol (MCP) server to help you find the insights you need, quickly and efficiently.
 
-The system is built with Python, utilizing `hatch` for project management and `pytest` for testing. It's designed to be robust and provide actionable insights from various log and report files.
+**Why use Log Analyzer MCP?**
+
+- **Simplify Log Analysis:** Cut through the noise with flexible parsing, advanced filtering (time-based, content, positional), and configurable context display.
+- **Integrate with Your Workflow:** Use it as a standalone `loganalyzer` CLI tool for scripting and direct analysis, or integrate the MCP server with compatible clients like Cursor for an AI-assisted experience.
+- **Extensible and Configurable:** Define custom log sources, patterns, and search scopes to tailor the analysis to your specific needs.
 
 ## Key Features
 
-- **MCP Server Implementation**: Provides a suite of tools accessible via the Model-Context-Protocol.
-- **Test Log Analysis**: Parses `pytest` output to summarize test results, identify failures, and extract error details.
-- **Runtime Error Analysis**: Scans application runtime logs to find and contextualize errors based on execution IDs.
-- **Code Coverage Reporting**: Generates and parses code coverage reports (XML format) to provide insights into test effectiveness.
-- **Hatch Integration**: Uses `hatch` for dependency management, environment control, and running tests/coverage.
-- **Subprocess Coverage**: Includes mechanisms to capture code coverage from subprocesses started by the MCP server tools.
+- **Core Log Analysis Engine:** Robust backend for parsing and searching various log formats.
+- **`loganalyzer` CLI:** Intuitive command-line tool for direct log interaction.
+- **MCP Server:** Exposes log analysis capabilities to MCP clients, enabling features like:
+  - Test log summarization (`analyze_tests`).
+  - Execution of test runs with varying verbosity.
+  - Targeted unit test execution (`run_unit_test`).
+  - On-demand code coverage report generation (`create_coverage_report`).
+  - Advanced log searching: all records, time-based, first/last N records.
+- **Hatch Integration:** For easy development, testing, and dependency management.
 
-## Getting Started
+## Getting Started: Using Log Analyzer MCP
 
-This project uses `hatch` for environment and project management.
+There are two primary ways to use Log Analyzer MCP:
 
-1. **Install Hatch:**
-    Follow the instructions on the [official Hatch website](https://hatch.pypa.io/latest/install/).
+1. **As a Command-Line Tool (`loganalyzer`):**
+    - Ideal for direct analysis, scripting, or quick checks.
+    - Requires Python 3.9+.
+    - For installation and usage, please see the [Getting Started Guide](./docs/getting_started.md).
 
-2. **Clone the repository:**
+2. **As an MCP Server (e.g., with Cursor):**
+    - Integrates log analysis capabilities directly into your AI-assisted development environment.
+    - To install and configure the MCP server for use in a client like Cursor, follow the instructions below.
 
-    ```bash
-    git clone <repository-url>
-    cd log_analyzer_mcp
-    ```
+### Installing the MCP Server for Client Integration
 
-3. **Activate the Hatch environment:**
+To integrate the Log Analyzer MCP server with a client application (like Cursor), you'll typically configure the client to launch the `log-analyzer-mcp` package, which is available on PyPI.
 
-    ```bash
-    hatch shell
-    ```
+**Example Client Configuration (e.g., in `.cursor/mcp.json`):**
 
-    This will create a virtual environment and install all dependencies if it's the first time.
+```json
+{
+  "mcpServers": {
+    "log_analyzer_mcp_server_prod": {
+      "command": "uvx", // uvx is a tool to run python executables from venvs
+      "args": [
+        "log-analyzer-mcp" // Fetches and runs the latest version from PyPI
+        // Or, for a specific version: "log-analyzer-mcp==0.2.0"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONIOENCODING": "utf-8",
+        "MCP_LOG_LEVEL": "INFO", // Recommended for production
+        // "MCP_LOG_FILE": "/path/to/your/logs/mcp/log_analyzer_mcp_server.log", // Optional
+        // --- Configure Log Analyzer specific settings via environment variables ---
+        // Example: "LOG_DIRECTORIES": "[\"/path/to/your/app/logs\"]",
+        // Example: "LOG_PATTERNS_ERROR": "[\"Exception:.*\"]"
+        // (Refer to docs/configuration.md (once created) for all options)
+      }
+    }
+    // You can add other MCP servers here
+  }
+}
+```
 
-4. **Run Tests:**
+**Notes:**
 
-    ```bash
-    hatch test
-    ```
+- Replace placeholder paths and consult the [Getting Started Guide](./docs/getting_started.md) and [Developer Guide](./docs/developer_guide.md) for more on configuration options and environment variables.
+- The actual package name on PyPI is `log-analyzer-mcp`.
 
-5. **Run Tests with Coverage:**
+## Documentation
 
-    ```bash
-    hatch test --cover -v
-    ```
-
-For more detailed information on development, testing, and refactoring, please refer to our documentation:
-
-- **[Refactoring Plan](./docs/refactoring/log_analyzer_refactoring_v1.md)**
-- **[Testing Overview](./docs/testing/README.md)**
-
-## MCP Server Tools
-
-The server provides tools such as:
-
-- `ping`: Checks server status.
-- `analyze_tests`: Analyzes test logs.
-- `run_tests_no_verbosity`, `run_tests_verbose`: Runs tests with different verbosity.
-- `run_unit_test`: Runs specific unit tests.
-- `analyze_runtime_errors`: Analyzes runtime application logs.
-- `create_coverage_report`: Generates coverage XML.
-- `get_coverage_report`: Parses and returns coverage data.
-
-(Refer to `docs/testing/README.md` for more details on server tools, though this file might need an update to reflect the current state precisely).
+- **[Getting Started Guide](./docs/getting_started.md):** For users and integrators.
+- **[Developer Guide](./docs/developer_guide.md):** For contributors and those building from source.
+- **[Refactoring Plan](./docs/refactoring/log_analyzer_refactoring_v2.md):** Technical details on the ongoing evolution of the project.
+- **(Upcoming) Configuration Guide:** Detailed explanation of all `.env` and environment variable settings.
+- **(Upcoming) CLI Usage Guide:** Comprehensive guide to all `loganalyzer` commands and options.
 
 ## Contributing
 
-Please see `CONTRIBUTING.md` for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) and the [Developer Guide](./docs/developer_guide.md) for guidelines on how to set up your environment, test, and contribute.
 
 ## License
 
-Chroma MCP Server is licensed under the MIT License with Commons Clause. This means you can:
-
-✅ **Allowed**:
-
-- Use Log Analyzer MCP for any purpose (personal, commercial, academic)
-- Modify the code
-- Distribute copies
-- Create and sell products built using Log Analyzer MCP
-
-❌ **Not Allowed**:
-
-- Sell Log Analyzer MCP itself
-- Offer Log Analyzer MCP as a hosted service
-- Create competing products based on Log Analyzer MCP
-
-See the [LICENSE.md](LICENSE.md) file for the complete license text.
+Log Analyzer MCP is licensed under the MIT License with Commons Clause. See [LICENSE.md](./LICENSE.md) for details.

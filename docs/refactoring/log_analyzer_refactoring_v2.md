@@ -84,7 +84,7 @@ This phase is considered complete as per `log_analyzer_refactoring_v1.md`. All i
   - [x] **In `tests/log_analyzer_mcp/`:**
     - [x] Write comprehensive tests for the core analysis engine (`src/log_analyzer_mcp/core/analysis_engine.py`).
     - [x] Write tests for the new `.env` configuration loading and environment variable overrides (if handled by a shared module in `src/log_analyzer_mcp/common`). (Covered by `AnalysisEngine` tests with `ConfigLoader`)
-    - [x] Write tests for the new/updated MCP server tools in `log_analyzer_mcp_server.py`. (Partially covered, `test_quick_subset` and related server session issues remain `xfail`)
+    - [x] Write tests for the new/updated MCP server tools in `log_analyzer_mcp_server.py`. (Tests written; core functionality confirmed via direct MCP calls, but automated tests like `test_quick_subset` remain `xfail` due to `server_session` fixture issues)
     - [x] **Remove tests related to `parse_coverage.py`.** (Done)
     - [x] **Adapt or remove tests for `analyze_runtime_errors.py` once the module is removed.** (Adapted, `test_analyze_runtime_errors.py` calls direct function)
     - [x] Update tests for `log_analyzer.py` if it's retained in any form, or remove them if its functionality is fully migrated. (Superseded by `test_log_parser.py` and `AnalysisEngine` tests)

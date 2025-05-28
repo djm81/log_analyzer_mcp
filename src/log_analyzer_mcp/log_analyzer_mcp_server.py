@@ -12,7 +12,7 @@ import subprocess
 import sys
 import traceback
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -40,39 +40,96 @@ if "COVERAGE_PROCESS_START" in os.environ:
     except ImportError:
         # print("DEBUG: COVERAGE_PROCESS_START set, but coverage module not found.", flush=True)
         pass  # Or handle error if coverage is mandatory for the subprocess
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception:  # pylint: disable=broad-exception-caught
         # print(f"DEBUG: Error calling coverage.process_startup(): {e}", flush=True)
         pass
 
 # Define project_root and script_dir here as they are used for path definitions
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(script_dir))
+# project_root = os.path.dirname(os.path.dirname(script_dir)) # No longer needed here if logger_setup is robust
 
 # Set up logging using centralized configuration
-logs_base_dir = get_logs_dir()
-mcp_log_dir = os.path.join(logs_base_dir, "mcp")
-os.makedirs(mcp_log_dir, exist_ok=True)
-log_file_path = os.path.join(mcp_log_dir, "log_analyzer_mcp_server.log")
+logs_base_dir = get_logs_dir()  # RESTORED - this should now be correct
+mcp_log_dir = os.path.join(logs_base_dir, "mcp")  # RESTORED
+# Ensure project_root is correctly determined as the actual project root
+# Forcing a known-good structure relative to where log_analyzer_mcp_server.py is.
+# __file__ is src/log_analyzer_mcp/log_analyzer_mcp_server.py
+# script_dir is src/log_analyzer_mcp/
+# parent of script_dir is src/
+# parent of parent of script_dir is PROJECT_ROOT
+# actual_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # REMOVE direct calculation here
+
+# mcp_log_dir = os.path.join(actual_project_root, "logs", "mcp") # REMOVE direct calculation here
+os.makedirs(mcp_log_dir, exist_ok=True)  # This is fine, mcp_log_dir is now from get_logs_dir()
+
+# Determine the log file path, prioritizing MCP_LOG_FILE env var
+env_log_file = os.getenv("MCP_LOG_FILE")
+if env_log_file:
+    log_file_path = os.path.abspath(env_log_file)
+    # Ensure the directory for the environment-specified log file exists
+    env_log_file_dir = os.path.dirname(log_file_path)
+    if not os.path.exists(env_log_file_dir):
+        try:
+            os.makedirs(env_log_file_dir, exist_ok=True)
+            # Temporary print to confirm this path is taken
+            print(
+                f"DEBUG_MCP_SERVER: Ensured directory exists for MCP_LOG_FILE: {env_log_file_dir}",
+                file=sys.stderr,
+                flush=True,
+            )
+        except OSError as e:
+            print(
+                f"Warning: Could not create directory for MCP_LOG_FILE {env_log_file_dir}: {e}",
+                file=sys.stderr,
+                flush=True,
+            )
+            # Fallback to default if directory creation fails for env var path
+            log_file_path = os.path.join(mcp_log_dir, "log_analyzer_mcp_server.log")
+    print(
+        f"DEBUG_MCP_SERVER: Using MCP_LOG_FILE from environment: {log_file_path}", file=sys.stderr, flush=True
+    )  # ADDED
+else:
+    log_file_path = os.path.join(mcp_log_dir, "log_analyzer_mcp_server.log")
+    print(f"DEBUG_MCP_SERVER: Using default log_file_path: {log_file_path}", file=sys.stderr, flush=True)  # ADDED
 
 logger = LoggerSetup.create_logger("LogAnalyzerMCP", log_file_path, agent_name="LogAnalyzerMCP")
 logger.setLevel("DEBUG")  # Set to debug level for MCP server
+
+# CRITICAL DEBUG: Print to stderr immediately after logger setup
+print(f"DEBUG_MCP_SERVER: Logger initialized. Attempting to log to: {log_file_path}", file=sys.stderr, flush=True)
 
 logger.info("Log Analyzer MCP Server starting. Logging to %s", log_file_path)
 
 # Initialize AnalysisEngine instance (can be done once)
 # It will load .env settings by default upon instantiation.
-analysis_engine = AnalysisEngine()
+analysis_engine = AnalysisEngine(logger_instance=logger)
 
 # Update paths for scripts and logs (using project_root and script_dir)
 # log_analyzer_path = os.path.join(script_dir, 'log_analyzer.py') # REMOVED
 # run_tests_path = os.path.join(project_root, 'tests/run_all_tests.py') # REMOVED - using hatch test directly
 # run_coverage_path = os.path.join(script_dir, 'create_coverage_report.sh') # REMOVED - using hatch run hatch-test:* directly
 # analyze_runtime_errors_path = os.path.join(script_dir, 'analyze_runtime_errors.py') # REMOVED
-test_log_file = os.path.join(logs_base_dir, "run_all_tests.log")  # Main test log, now populated by hatch test output
-# coverage_xml_path = os.path.join(logs_base_dir, 'tests', 'coverage', 'coverage.xml') # REMOVED
+test_log_file = os.path.join(
+    logs_base_dir, "run_all_tests.log"  # RESTORED logs_base_dir
+)  # Main test log, now populated by hatch test output
+# coverage_xml_path = os.path.join(logs_base_dir, 'tests', 'coverage', 'coverage.xml') # RESTORED logs_base_dir
 
 # Initialize FastMCP server
-mcp = FastMCP("log_analyzer")
+# Add lifespan support for startup/shutdown with strong typing
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def server_lifespan(server: FastMCP) -> AsyncIterator[None]:  # Simple lifespan, no app context needed
+    logger.info("MCP Server Lifespan: Startup phase entered.")
+    try:
+        yield
+    finally:
+        logger.info("MCP Server Lifespan: Shutdown phase entered (finally block).")
+
+
+mcp = FastMCP("log_analyzer", lifespan=server_lifespan)
 
 
 # Define input models for tool validation
@@ -104,7 +161,7 @@ class RunUnitTestInput(BaseModel):
 
 
 # Define default runtime logs directory
-DEFAULT_RUNTIME_LOGS_DIR = os.path.join(logs_base_dir, "runtime")
+DEFAULT_RUNTIME_LOGS_DIR = os.path.join(logs_base_dir, "runtime")  # RESTORED logs_base_dir
 
 
 # async def analyze_test_log(log_file_path: str, summary_only: bool = False) -> Dict[str, Any]: # REMOVED: Functionality moved to test_log_parser
@@ -116,7 +173,7 @@ DEFAULT_RUNTIME_LOGS_DIR = os.path.join(logs_base_dir, "runtime")
 
 
 @mcp.tool()
-async def analyze_tests(summary_only: bool = False) -> Dict[str, Any]:
+async def analyze_tests(summary_only: bool = False) -> dict[str, Any]:
     """Analyze the most recent test run and provide detailed information about failures.
 
     Args:
@@ -137,7 +194,7 @@ async def analyze_tests(summary_only: bool = False) -> Dict[str, Any]:
         return {"error": error_msg, "summary": {"status": "ERROR", "passed": 0, "failed": 0, "skipped": 0}}
 
     try:
-        with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+        with open(log_file, encoding="utf-8", errors="ignore") as f:
             log_contents = f.read()
 
         if not log_contents.strip():
@@ -177,11 +234,11 @@ async def analyze_tests(summary_only: bool = False) -> Dict[str, Any]:
 
 
 async def _run_tests(
-    verbosity: Optional[Any] = None,
-    agent: Optional[str] = None,
-    pattern: Optional[str] = None,
+    verbosity: Any | None = None,
+    agent: str | None = None,
+    pattern: str | None = None,
     run_with_coverage: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Internal helper function to run tests using hatch.
 
     Args:
@@ -254,14 +311,19 @@ async def _run_tests(
 
     # Ensure the log file is cleared or managed before test run if it's always written to the same path
     # For now, assuming log_analyzer.py handles this or we analyze the latest run.
-    test_log_output_path = os.path.join(logs_base_dir, "run_all_tests.log")
+    test_log_output_path = os.path.join(logs_base_dir, "run_all_tests.log")  # RESTORED logs_base_dir
     logger.debug("Expected test output log path for analysis: %s", test_log_output_path)
 
     try:
-        logger.info("Executing hatch command: %s with cwd=%s", " ".join(hatch_cmd), project_root)
+        # Correctly reference PROJECT_ROOT from the logger_setup module
+        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # ADDED import for clarity
+
+        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
+
+        logger.info("Executing hatch command: %s with cwd=%s", " ".join(hatch_cmd), current_project_root)  # MODIFIED
         with subprocess.Popen(
             hatch_cmd,
-            cwd=project_root,
+            cwd=current_project_root,  # MODIFIED
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -385,19 +447,19 @@ async def _run_tests(
 
 
 @mcp.tool()
-async def run_tests_no_verbosity() -> Dict[str, Any]:
+async def run_tests_no_verbosity() -> dict[str, Any]:
     """Run all tests with minimal output (verbosity level 0)."""
     return await _run_tests("0")
 
 
 @mcp.tool()
-async def run_tests_verbose() -> Dict[str, Any]:
+async def run_tests_verbose() -> dict[str, Any]:
     """Run all tests with verbose output (verbosity level 1)."""
     return await _run_tests("1")
 
 
 @mcp.tool()
-async def run_tests_very_verbose() -> Dict[str, Any]:
+async def run_tests_very_verbose() -> dict[str, Any]:
     """Run all tests with very verbose output (verbosity level 2)."""
     logger.info("Running tests with verbosity 2...")
     return await _run_tests(verbosity=2, run_with_coverage=True)
@@ -410,7 +472,7 @@ async def ping() -> str:
     return f"Status: ok\n" f"Timestamp: {datetime.now().isoformat()}\n" f"Message: Log Analyzer MCP Server is running"
 
 
-async def run_coverage_script(force_rebuild: bool = False) -> Dict[str, Any]:
+async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
     """
     Run tests with coverage, generate XML and HTML reports using hatch, and capture text summary.
 
@@ -422,8 +484,10 @@ async def run_coverage_script(force_rebuild: bool = False) -> Dict[str, Any]:
     """
     logger.info("Running coverage generation using hatch (force_rebuild=%s)...", force_rebuild)
 
-    coverage_xml_report_path = os.path.join(logs_base_dir, "tests", "coverage", "coverage.xml")
-    coverage_html_report_dir = os.path.join(logs_base_dir, "tests", "coverage", "html")
+    coverage_xml_report_path = os.path.join(
+        logs_base_dir, "tests", "coverage", "coverage.xml"
+    )  # RESTORED logs_base_dir
+    coverage_html_report_dir = os.path.join(logs_base_dir, "tests", "coverage", "html")  # RESTORED logs_base_dir
     coverage_html_index_path = os.path.join(coverage_html_report_dir, "index.html")
 
     # Step 1: Run tests with coverage enabled using our _run_tests helper
@@ -451,7 +515,14 @@ async def run_coverage_script(force_rebuild: bool = False) -> Dict[str, Any]:
     xml_output_text = ""
     xml_success = False
     try:
-        xml_process = subprocess.run(hatch_xml_cmd, capture_output=True, text=True, cwd=project_root, check=False)
+        # Correctly reference PROJECT_ROOT from the logger_setup module
+        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # Ensure import if not already visible
+
+        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
+
+        xml_process = subprocess.run(
+            hatch_xml_cmd, capture_output=True, text=True, cwd=current_project_root, check=False  # MODIFIED
+        )
         xml_output_text = xml_process.stdout + xml_process.stderr
         if xml_process.returncode == 0 and os.path.exists(coverage_xml_report_path):
             logger.info("XML coverage report generated: %s", coverage_xml_report_path)
@@ -468,7 +539,14 @@ async def run_coverage_script(force_rebuild: bool = False) -> Dict[str, Any]:
     html_output_text = ""
     html_success = False
     try:
-        html_process = subprocess.run(hatch_html_cmd, capture_output=True, text=True, cwd=project_root, check=False)
+        # Correctly reference PROJECT_ROOT from the logger_setup module
+        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # Ensure import if not already visible
+
+        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
+
+        html_process = subprocess.run(
+            hatch_html_cmd, capture_output=True, text=True, cwd=current_project_root, check=False  # MODIFIED
+        )
         html_output_text = html_process.stdout + html_process.stderr
         if html_process.returncode == 0 and os.path.exists(coverage_html_index_path):
             logger.info("HTML coverage report generated in: %s", coverage_html_report_dir)
@@ -485,8 +563,13 @@ async def run_coverage_script(force_rebuild: bool = False) -> Dict[str, Any]:
     summary_output_text = ""
     summary_success = False
     try:
+        # Correctly reference PROJECT_ROOT from the logger_setup module
+        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # Ensure import if not already visible
+
+        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
+
         summary_process = subprocess.run(
-            hatch_summary_cmd, capture_output=True, text=True, cwd=project_root, check=False
+            hatch_summary_cmd, capture_output=True, text=True, cwd=current_project_root, check=False  # MODIFIED
         )
         if summary_process.returncode == 0:
             summary_output_text = summary_process.stdout + summary_process.stderr
@@ -534,7 +617,7 @@ async def run_coverage_script(force_rebuild: bool = False) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def create_coverage_report(force_rebuild: bool = False) -> Dict[str, Any]:
+async def create_coverage_report(force_rebuild: bool = False) -> dict[str, Any]:
     """
     Run the coverage report script and generate HTML and XML reports.
 
@@ -548,7 +631,7 @@ async def create_coverage_report(force_rebuild: bool = False) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def run_unit_test(agent: str, verbosity: int = 1) -> Dict[str, Any]:
+async def run_unit_test(agent: str, verbosity: int = 1) -> dict[str, Any]:
     """
     Run tests for a specific agent only.
 
@@ -600,8 +683,6 @@ class BaseSearchInput(BaseModel):
 class SearchLogAllInput(BaseSearchInput):
     """Input for search_log_all_records."""
 
-    ...
-
 
 @mcp.tool()
 async def search_log_all_records(
@@ -610,8 +691,16 @@ async def search_log_all_records(
     context_after: int = 2,
     log_dirs_override: str = "",
     log_content_patterns_override: str = "",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Search for all log records, optionally filtering by scope and content patterns, with context."""
+    # Forcing re-initialization of analysis_engine for debugging module caching.
+    # Pass project_root_for_config=None to allow AnalysisEngine to determine it.
+    current_analysis_engine = AnalysisEngine(logger_instance=logger, project_root_for_config=None)
+    print(
+        f"DEBUG_MCP_TOOL_SEARCH_ALL: Entered search_log_all_records with log_dirs_override='{log_dirs_override}'",
+        file=sys.stderr,
+        flush=True,
+    )
     logger.info(
         "MCP search_log_all_records called with scope='%s', context=%sB/%sA, "
         "log_dirs_override='%s', log_content_patterns_override='%s'",
@@ -632,12 +721,12 @@ async def search_log_all_records(
         log_content_patterns_override=log_content_patterns_list,
     )
     try:
-        results = await asyncio.to_thread(analysis_engine.search_logs, filter_criteria)
+        results = await asyncio.to_thread(current_analysis_engine.search_logs, filter_criteria)
         logger.info("search_log_all_records returning %s records.", len(results))
         return results
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error in search_log_all_records: %s", e, exc_info=True)
-        custom_message = f"Failed to search all logs: {str(e)}"
+        custom_message = f"Failed to search all logs: {e!s}"
         raise McpError(ErrorData(code=-32603, message=custom_message)) from e
 
 
@@ -664,7 +753,7 @@ async def search_log_time_based(
     context_after: int = 2,
     log_dirs_override: str = "",
     log_content_patterns_override: str = "",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Search logs within a time window, optionally filtering, with context."""
     logger.info(
         "MCP search_log_time_based called with time=%sd/%sh/%sm, scope='%s', "
@@ -702,7 +791,7 @@ async def search_log_time_based(
         return results
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error in search_log_time_based: %s", e, exc_info=True)
-        custom_message = f"Failed to search time-based logs: {str(e)}"
+        custom_message = f"Failed to search time-based logs: {e!s}"
         raise McpError(ErrorData(code=-32603, message=custom_message)) from e
 
 
@@ -720,7 +809,7 @@ async def search_log_first_n_records(
     context_after: int = 2,
     log_dirs_override: str = "",
     log_content_patterns_override: str = "",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Search for the first N (oldest) records, optionally filtering, with context."""
     logger.info(
         "MCP search_log_first_n_records called with count=%s, scope='%s', "
@@ -754,7 +843,7 @@ async def search_log_first_n_records(
         return results
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error in search_log_first_n_records: %s", e, exc_info=True)
-        custom_message = f"Failed to search first N logs: {str(e)}"
+        custom_message = f"Failed to search first N logs: {e!s}"
         raise McpError(ErrorData(code=-32603, message=custom_message)) from e
 
 
@@ -772,7 +861,7 @@ async def search_log_last_n_records(
     context_after: int = 2,
     log_dirs_override: str = "",
     log_content_patterns_override: str = "",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Search for the last N (newest) records, optionally filtering, with context."""
     logger.info(
         "MCP search_log_last_n_records called with count=%s, scope='%s', "
@@ -806,8 +895,22 @@ async def search_log_last_n_records(
         return results
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error in search_log_last_n_records: %s", e, exc_info=True)
-        custom_message = f"Failed to search last N logs: {str(e)}"
+        custom_message = f"Failed to search last N logs: {e!s}"
         raise McpError(ErrorData(code=-32603, message=custom_message)) from e
+
+
+@mcp.tool()
+async def get_server_env_details() -> dict[str, Any]:
+    """Returns sys.path and sys.executable from the running MCP server."""
+    logger.info("get_server_env_details called.")
+    details = {
+        "sys_executable": sys.executable,
+        "sys_path": sys.path,
+        "cwd": os.getcwd(),
+        "environ_pythonpath": os.environ.get("PYTHONPATH"),
+    }
+    logger.info(f"Server env details: {details}")
+    return details
 
 
 if __name__ == "__main__":
@@ -833,6 +936,7 @@ if __name__ == "__main__":
             "search_log_time_based",
             "search_log_first_n_records",
             "search_log_last_n_records",
+            "get_server_env_details",
         ]
         logger.debug("Available tools (manually listed for logging): %s", ", ".join(known_tool_names))
 
@@ -856,23 +960,6 @@ if __name__ == "__main__":
 
         # Assign the patched method
         mcp.run = patched_run
-
-        # Add more logging to the initialize handler if it exists
-        if hasattr(mcp, "_handle_initialize"):
-            original_initialize = getattr(mcp, "_handle_initialize")
-
-            async def patched_initialize(*args, **kwargs):
-                logger.info("Handling initialize request with args: %s, kwargs: %s", args, kwargs)
-                try:
-                    result = await original_initialize(*args, **kwargs)
-                    logger.info("Initialize completed successfully: %s", result)
-                    return result
-                except Exception as e:  # pylint: disable=broad-exception-caught
-                    logger.error("Exception in _handle_initialize: %s", e)
-                    logger.error("Traceback: %s", traceback.format_exc())
-                    raise
-
-            setattr(mcp, "_handle_initialize", patched_initialize)
 
         # Run the server
         logger.info("About to run MCP server")

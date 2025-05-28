@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "log_analyzer_mcp"
-version = "0.1.2"
+version = "0.1.3"
 description = "MCP server and tools for analyzing test and runtime logs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -54,6 +54,7 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.1",
     "click>=8.1.0", # Added for CLI client
+    "toml>=0.10.2",
 ]
 
 [project.optional-dependencies]
@@ -294,6 +295,15 @@ max-line-length = 120
 [tool.hatch.version]
 path = "src/log_analyzer_mcp/__init__.py"
 
+[tool.ruff]
+line-length = 120
+# For now, let's only select E501 to test line length fixing.
+# We can add other rules later once this works.
+# select = ["E", "F", "W", "I", "N", "D", "Q", "ANN", "RUF"]
+select = ["E501"]
+# We can also specify ignores if needed, e.g.:
+# ignore = ["D203", "D212"]
+
 # Add build hook configuration if needed, for example:
 # [tool.hatch.build.hooks.custom]
-# path = "hatch_hooks.py" # A custom script for build hooks 
+# path = "hatch_hooks.py" # A custom script for build hooks

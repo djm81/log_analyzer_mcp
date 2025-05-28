@@ -6,6 +6,7 @@ import os
 import re  # For basic parsing
 from datetime import datetime as DateTimeClassForCheck  # Specific import for isinstance check
 from typing import Any, Dict, List, Optional  # Added Any for filter_criteria flexibility
+import logging  # Add logging import
 
 from ..common.config_loader import ConfigLoader
 
@@ -17,17 +18,18 @@ ParsedLogEntry = Dict[str, Any]  # Keys: 'timestamp', 'level', 'message', 'raw_l
 
 
 class AnalysisEngine:
-    def __init__(self, env_file_path: Optional[str] = None, project_root_for_config: Optional[str] = None):
-        self.config_loader = ConfigLoader(env_file_path=env_file_path, project_root=project_root_for_config)
+    def __init__(
+        self,
+        logger_instance: logging.Logger,
+        env_file_path: Optional[str] = None,
+        project_root_for_config: Optional[str] = None,
+    ):
+        self.logger = logger_instance
+        self.config_loader = ConfigLoader(env_file_path=env_file_path, project_root_for_config=project_root_for_config)
 
-        # Load configurations
-        self.log_directories: List[str] = (
-            self.config_loader.get_log_directories()
-        )  # Default log dirs/patterns from config
-        self.log_content_patterns: Dict[str, List[str]] = (
-            self.config_loader.get_log_patterns()
-        )  # Default content regexes
-        # These are loaded from config, but can be overridden by filter_criteria per call
+        # Load configurations using the correct ConfigLoader methods
+        self.log_directories: List[str] = self.config_loader.get_log_directories()
+        self.log_content_patterns: Dict[str, List[str]] = self.config_loader.get_log_patterns()
         self.default_context_lines_before: int = self.config_loader.get_context_lines_before()
         self.default_context_lines_after: int = self.config_loader.get_context_lines_after()
         self.logging_scopes: Dict[str, str] = self.config_loader.get_logging_scopes()
@@ -43,49 +45,69 @@ class AnalysisEngine:
         log_dirs_override can contain direct file paths, directory paths, or glob patterns.
         If a directory path is provided, it searches for '*.log' files recursively.
         """
+        self.logger.info(f"[_get_target_log_files] Called with scope: {scope}, override: {log_dirs_override}")
         target_paths_or_patterns: List[str] = []
-        # Use the project_root from the config_loader, which can be set for tests
         project_root = self.config_loader.project_root
+        self.logger.info(f"[_get_target_log_files] Project root: {project_root}")
 
         using_override_dirs = False
         if log_dirs_override:
+            self.logger.info(f"[_get_target_log_files] Using log_dirs_override: {log_dirs_override}")
             target_paths_or_patterns.extend(log_dirs_override)
             using_override_dirs = True
         elif scope and scope.lower() in self.logging_scopes:
             path_or_pattern = self.logging_scopes[scope.lower()]
+            self.logger.info(f"[_get_target_log_files] Using scope '{scope}', path_or_pattern: {path_or_pattern}")
             abs_scope_path = os.path.abspath(os.path.join(project_root, path_or_pattern))
             if not abs_scope_path.startswith(project_root):
-                print(f"Warning: Scope '{scope}' path '{path_or_pattern}' resolves outside project root. Skipping.")
+                self.logger.warning(
+                    f"Scope '{scope}' path '{path_or_pattern}' resolves outside project root. Skipping."
+                )
                 return []
             target_paths_or_patterns.append(abs_scope_path)
         elif scope:  # Scope was provided but not found in self.logging_scopes
-            print(f"[AnalysisEngine] Scope '{scope}' not found in configuration. Returning no files for this scope.")
-            return []  # Explicitly return empty list for unknown scope
+            self.logger.info(
+                f"[AnalysisEngine] Scope '{scope}' not found in configuration. Returning no files for this scope."
+            )
+            return []
         else:
-            # Fallback to default configured log directories ONLY if no scope was given
+            self.logger.info(
+                f"[_get_target_log_files] Using default log_directories from config: {self.log_directories}"
+            )
             for log_dir_pattern in self.log_directories:
                 abs_log_dir_pattern = os.path.abspath(os.path.join(project_root, log_dir_pattern))
                 if not abs_log_dir_pattern.startswith(project_root):
-                    print(
-                        f"Warning: Log directory pattern '{log_dir_pattern}' resolves outside project root. Skipping."
+                    self.logger.warning(
+                        f"Log directory pattern '{log_dir_pattern}' resolves outside project root. Skipping."
                     )
                     continue
                 target_paths_or_patterns.append(abs_log_dir_pattern)
 
+        self.logger.info(f"[_get_target_log_files] Effective target_paths_or_patterns: {target_paths_or_patterns}")
+
         resolved_files: List[str] = []
         for path_or_pattern_input in target_paths_or_patterns:
-            # Normalize path: if relative, join with project_root. If absolute, use as is.
-            # This is crucial for glob and safety checks.
+            self.logger.info(f"[_get_target_log_files] Processing input: {path_or_pattern_input}")
             if not os.path.isabs(path_or_pattern_input):
                 current_search_item = os.path.abspath(os.path.join(project_root, path_or_pattern_input))
+                self.logger.info(
+                    f"[_get_target_log_files] Relative input '{path_or_pattern_input}' made absolute: {current_search_item}"
+                )
             else:
                 current_search_item = os.path.abspath(path_or_pattern_input)
+                self.logger.info(
+                    f"[_get_target_log_files] Absolute input '{path_or_pattern_input}' normalized to: {current_search_item}"
+                )
 
-            # Safety check: Ensure the path is within the project root
             if not current_search_item.startswith(project_root):
+                self.logger.warning(
+                    f"[_get_target_log_files] Item '{current_search_item}' is outside project root '{project_root}'. Skipping."
+                )
                 continue
 
+            self.logger.info(f"[_get_target_log_files] Checking item: {current_search_item}")
             if os.path.isfile(current_search_item):
+                self.logger.info(f"[_get_target_log_files] Item '{current_search_item}' is a file.")
                 # If current_search_item came from a scope that resolved to a direct file,
                 # or from an override that was a direct file, include it.
                 # The `using_override_dirs` flag helps distinguish.
@@ -131,11 +153,14 @@ class AnalysisEngine:
                         os.path.isfile(abs_filepath)
                         and not abs_filepath.endswith(".log")
                         and using_override_dirs
-                        and not os.path.isdir(path_or_pattern_input)
+                        and not os.path.isdir(path_or_pattern_input)  # Ensure original input wasn't a directory
                         and (
-                            os.path.splitext(abs_filepath)[1] in os.path.splitext(current_search_item)[1]
-                            if not glob.has_magic(current_search_item)
-                            else True
+                            os.path.splitext(abs_filepath)[1]
+                            in os.path.splitext(current_search_item)[1]  # Check if glob was for specific ext
+                            if not glob.has_magic(
+                                current_search_item
+                            )  # If current_search_item was specific file (not a glob)
+                            else True  # If current_search_item itself was a glob (e.g. *.txt)
                         )
                     ):
                         # If using override_dirs and the override was a specific file path (not a pattern or dir) that doesn't end with .log, still include it.
@@ -161,37 +186,51 @@ class AnalysisEngine:
         return sorted(list(set(resolved_files)))  # Unique sorted list
 
     def _parse_log_line(self, line: str, file_path: str, line_number: int) -> Optional[ParsedLogEntry]:
-        """Parses a single log line. Placeholder implementation."""
-        # Example: "2024-05-27 10:00:00 INFO This is a log message."
-        # This regex is a placeholder and needs to be made configurable.
-        # It also doesn't handle multi-line logs yet.
-        # Ensure LOG_CONTENT_REGEX_PATTERN_<LEVEL> from .env or a default is used here.
-        # For now, sticking to a generic one.
-        match = re.match(
-            r"^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d{3})?)\s+(?P<level>[A-Z]+)\s+(?P<message>.*)$",
-            line,
+        """Parses a single log line. Attempts to match a common log format and falls back gracefully."""
+        # Regex for "YYYY-MM-DD HH:MM:SS[,ms] LEVEL MESSAGE"
+        # It captures timestamp, level, and message. Milliseconds are optional.
+        log_pattern = re.compile(
+            r"^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d{3})?)\s+"
+            r"(?P<level>[A-Z]+(?:\s+[A-Z]+)*)\s+"  # Allow multi-word levels like 'INFO EXAMPLE'
+            r"(?P<message>.*)$"
         )
+        match = log_pattern.match(line)
+
         if match:
-            try:
-                groups = match.groupdict()
-                return {
-                    "timestamp": dt.datetime.strptime(
-                        groups["timestamp"].split(",")[0], "%Y-%m-%d %H:%M:%S"
-                    ),  # Use dt.datetime.strptime
-                    "level": groups["level"].upper(),
-                    "message": groups["message"].strip(),
-                    "raw_line": line.strip(),
-                    "file_path": file_path,
-                    "line_number": line_number,
-                }
-            except ValueError:
-                pass
-        # Fallback for lines that don't match the primary pattern (e.g. stack traces, multi-line messages)
-        # For now, we create a basic entry. Proper multi-line handling is a TODO.
+            groups = match.groupdict()
+            timestamp_str = groups.get("timestamp")
+            level_str = groups.get("level", "UNKNOWN").upper()
+            message_str = groups.get("message", "").strip()
+
+            parsed_timestamp: Optional[dt.datetime] = None
+            if timestamp_str:
+                # self.logger.debug(f"Attempting to parse timestamp string: '{timestamp_str}' from line: '{line.strip()}'") # DEBUG
+                try:
+                    # Handle optional milliseconds by splitting at comma
+                    timestamp_to_parse = timestamp_str.split(",")[0]
+                    parsed_timestamp = dt.datetime.strptime(timestamp_to_parse, "%Y-%m-%d %H:%M:%S")
+                except ValueError as e:
+                    self.logger.debug(
+                        f"ValueError parsing timestamp string: '{timestamp_str}' (tried '{timestamp_to_parse}'). Error: {e}. Line {line_number} in {file_path}: {line.strip()}"
+                    )
+                    # Fall through to return with None timestamp but other parsed fields
+
+            return {
+                "timestamp": parsed_timestamp,
+                "level": level_str,
+                "message": message_str,
+                "raw_line": line.strip(),
+                "file_path": file_path,
+                "line_number": line_number,
+            }
+
+        # Fallback for lines that don't match the primary pattern
+        # (e.g., stack traces, multi-line messages not handled by a continuation pattern)
+        self.logger.debug(f"Line did not match primary log pattern. Line {line_number} in {file_path}: {line.strip()}")
         return {
-            "timestamp": None,  # Or a file's modification time as a rough estimate if needed
+            "timestamp": None,
             "level": "UNKNOWN",
-            "message": line.strip(),  # The whole line becomes the message
+            "message": line.strip(),
             "raw_line": line.strip(),
             "file_path": file_path,
             "line_number": line_number,
@@ -203,77 +242,80 @@ class AnalysisEngine:
         """
         Filters entries based on content patterns.
         Uses 'log_content_patterns_override' from filter_criteria if available (as a list of general regexes).
-        Otherwise, uses level-specific regexes from self.log_content_patterns (config).
+        Otherwise, uses level-specific regexes from self.log_content_patterns (config) IF a level_filter is also provided.
         """
         override_patterns: Optional[List[str]] = filter_criteria.get("log_content_patterns_override")
 
         if override_patterns is not None:  # Check if the key exists, even if list is empty
             # Apply general override patterns
             if not override_patterns:  # Empty list provided (e.g. override_patterns == [])
-                return entries  # Return all entries if override is explicitly an empty list
+                self.logger.info(
+                    "[_apply_content_filters] log_content_patterns_override is empty list. Returning all entries."
+                )
+                return entries
 
             filtered_entries: List[ParsedLogEntry] = []
             for entry in entries:
                 message = entry.get("message", "")
+                # level = entry.get("level", "UNKNOWN").upper() # Not used in override path
 
-                entry_added = False
+                # entry_added = False # Not strictly needed with break
                 for pattern_str in override_patterns:
                     try:
                         if re.search(pattern_str, message, re.IGNORECASE):
                             filtered_entries.append(entry)
-                            entry_added = True
+                            # entry_added = True
                             break  # Matched one pattern, include entry and move to next entry
                     except re.error as e:
-                        print(
-                            f"Warning: Invalid regex in override_patterns: '{pattern_str}'. Error: {e}. Skipping this pattern."
+                        self.logger.warning(
+                            f"Invalid regex in override_patterns: '{pattern_str}'. Error: {e}. Skipping this pattern."
                         )
             return filtered_entries
         else:
-            # Use configured level-specific patterns
-            if not self.log_content_patterns or not any(
-                self.log_content_patterns.values()
-            ):  # No patterns defined in config
+            # No override_patterns. Use configured level-specific patterns only if a level_filter is present.
+            level_filter_str = filter_criteria.get("level_filter", "").upper()
+
+            if not level_filter_str:
+                # No specific level_filter provided in criteria, and no override patterns.
+                # Content filtering should not apply by default from env/config in this case.
+                self.logger.info(
+                    "[_apply_content_filters] No override patterns and no level_filter in criteria. Returning all entries."
+                )
                 return entries
 
-            filtered_entries: List[ParsedLogEntry] = []
+            # A specific level_filter_str IS provided. Use patterns for that level from self.log_content_patterns.
+            # self.log_content_patterns is Dict[str (lowercase level), List[str_patterns]]
+            # Ensure level_filter_str matches the key format (e.g. "error" not "ERROR")
+            relevant_patterns = self.log_content_patterns.get(level_filter_str.lower(), [])
+
+            self.logger.info(
+                f"[_apply_content_filters] Using config patterns for level_filter: '{level_filter_str}'. Relevant patterns: {relevant_patterns}"
+            )
+
+            # Filter by the specified level first.
+            # Then, if there are patterns for that level, apply them.
+            # If no patterns for that level, all entries of that level pass.
+
+            filtered_entries = []
             for entry in entries:
-                level = entry.get("level", "").lower()  # Match config keys like 'info', 'error'
+                entry_level = entry.get("level", "UNKNOWN").upper()
                 message = entry.get("message", "")
-                entry_matches = False
 
-                # Check against patterns for the specific level (e.g., self.log_content_patterns['error'])
-                level_specific_patterns = self.log_content_patterns.get(level, [])
-                if level_specific_patterns:
-                    for pattern_str in level_specific_patterns:
-                        try:
-                            if re.search(pattern_str, message, re.IGNORECASE):
-                                entry_matches = True
-                                break
-                        except re.error as e:
-                            print(
-                                f"Warning: Invalid regex for level '{level}': '{pattern_str}'. Error: {e}. Skipping this pattern."
-                            )
-
-                # Check against 'general' patterns if defined (e.g. self.log_content_patterns['general'])
-                # This allows for patterns that apply to all log levels if not matched by a specific level.
-                general_patterns = self.log_content_patterns.get("general", [])
-                if not entry_matches and general_patterns:  # Only check general if not already matched by specific
-                    for pattern_str in general_patterns:
-                        try:
-                            if re.search(pattern_str, message, re.IGNORECASE):
-                                entry_matches = True
-                                break
-                        except re.error as e:
-                            print(
-                                f"Warning: Invalid regex in 'general' patterns: '{pattern_str}'. Error: {e}. Skipping this pattern."
-                            )
-
-                if entry_matches:
-                    filtered_entries.append(entry)
-
-            if not filtered_entries:  # If no patterns specified (neither override nor config), match all
-                return entries
-
+                if entry_level == level_filter_str:  # Entry must match the specified level
+                    if not relevant_patterns:
+                        # No patterns for this level, so include if level matches
+                        filtered_entries.append(entry)
+                    else:
+                        # Patterns exist for this level, try to match them
+                        for pattern_str in relevant_patterns:
+                            try:
+                                if re.search(pattern_str, message, re.IGNORECASE):
+                                    filtered_entries.append(entry)
+                                    break  # Matched one pattern for this level, include entry
+                            except re.error as e:
+                                self.logger.warning(
+                                    f"Invalid regex in configured patterns for level {level_filter_str}: '{pattern_str}'. Error: {e}. Skipping pattern."
+                                )
             return filtered_entries
 
     def _apply_time_filters(
@@ -312,23 +354,33 @@ class AnalysisEngine:
         self, entries: List[ParsedLogEntry], filter_criteria: Dict[str, Any]
     ) -> List[ParsedLogEntry]:
         """Filters entries based on positional criteria (first_n, last_n)."""
-        # Filter out entries with no timestamp before sorting for positional filters
-        entries_with_timestamp = [e for e in entries if e.get("timestamp") is not None]
-
-        # Ensure entries are sorted by timestamp before applying positional filters
-        # ParsedLogEntry includes 'timestamp', which is a datetime object
-        # Using e["timestamp"] as we've filtered for its existence and non-None value.
-        sorted_entries = sorted(entries_with_timestamp, key=lambda e: e["timestamp"])
-
         first_n = filter_criteria.get("first_n")
         last_n = filter_criteria.get("last_n")
 
-        if first_n is not None and isinstance(first_n, int) and first_n > 0:
-            return sorted_entries[:first_n]
-        elif last_n is not None and isinstance(last_n, int) and last_n > 0:
-            return sorted_entries[-last_n:]
+        # Only filter by timestamp and sort if a positional filter is active
+        if (first_n is not None and isinstance(first_n, int) and first_n > 0) or (
+            last_n is not None and isinstance(last_n, int) and last_n > 0
+        ):
 
-        return sorted_entries  # Return sorted if no positional filter or if criteria are invalid
+            # Filter out entries with no timestamp before sorting for positional filters
+            entries_with_timestamp = [e for e in entries if e.get("timestamp") is not None]
+
+            # Ensure entries are sorted by timestamp before applying positional filters
+            # ParsedLogEntry includes 'timestamp', which is a datetime object
+            # Using e["timestamp"] as we've filtered for its existence and non-None value.
+            sorted_entries = sorted(entries_with_timestamp, key=lambda e: e["timestamp"])
+
+            if first_n is not None and isinstance(first_n, int) and first_n > 0:
+                return sorted_entries[:first_n]
+            elif last_n is not None and isinstance(last_n, int) and last_n > 0:
+                return sorted_entries[-last_n:]
+            else:
+                # Should not be reached if the outer if condition is met correctly
+                return sorted_entries
+
+        # If no positional filter is active, return the original entries
+        # Order might be important, so don't sort unless a positional filter needs it.
+        return entries
 
     def _extract_context_lines(
         self,
@@ -357,7 +409,7 @@ class AnalysisEngine:
                 entry["context_after_lines"] = []
                 entry["full_context_log"] = entry["raw_line"]
                 entries_with_context.append(entry)
-                print(f"Warning: File {file_path} not found in all_lines_by_file for context extraction.")
+                self.logger.warning(f"Warning: File {file_path} not found in all_lines_by_file for context extraction.")
                 continue
 
             file_lines = all_lines_by_file[file_path]
@@ -374,7 +426,7 @@ class AnalysisEngine:
             full_context_list = (
                 entry_copy["context_before_lines"] + [entry_copy["raw_line"]] + entry_copy["context_after_lines"]
             )
-            entry_copy["full_context_log"] = "\n".join(full_context_list)
+            entry_copy["full_context_log"] = "\\n".join(full_context_list)
 
             entries_with_context.append(entry_copy)
 
@@ -388,73 +440,86 @@ class AnalysisEngine:
         - scope: str (e.g., "mcp", "runtime" to use predefined paths from config)
         - log_content_patterns_override: List[str] (regexes for log message content)
         - level_filter: str (e.g., "ERROR", "WARNING")
-        - time_filter_type: str ("minutes", "hours", "days")
-        - time_filter_value: int (e.g., 30 for 30 minutes)
-        - positional_filter_type: str ("first_n", "last_n")
-        - positional_filter_value: int (e.g., 10 for first 10 records)
+        - time_filter_type: str ("minutes", "hours", "days") - maps to minutes, hours, days keys
+        - time_filter_value: int (e.g., 30 for 30 minutes) - maps to minutes, hours, days values
+        - positional_filter_type: str ("first_n", "last_n") - maps to first_n, last_n keys
+        - positional_filter_value: int (e.g., 10 for first 10 records) - maps to first_n, last_n values
         - context_before: int (lines of context before match)
         - context_after: int (lines of context after match)
         """
-        final_results: List[ParsedLogEntry] = []
-        all_raw_lines_by_file: Dict[str, List[str]] = {}  # For context extraction
+        self.logger.info(f"[AnalysisEngine.search_logs] Called with filter_criteria: {filter_criteria}")
+
+        all_raw_lines_by_file: Dict[str, List[str]] = {}
+        parsed_entries: List[ParsedLogEntry] = []
 
         # 1. Determine target log files
-        # Prioritize direct override, then scope, then default config
         target_files = self._get_target_log_files(
             scope=filter_criteria.get("scope"),
             log_dirs_override=filter_criteria.get("log_dirs_override"),
         )
 
         if not target_files:
-            print("[AnalysisEngine] No log files found to search.")
-            return []
+            self.logger.info(
+                "[AnalysisEngine.search_logs] No log files found by _get_target_log_files. Returning pathway OK message."
+            )
+            # Return a specific message indicating pathway is okay but no files found
+            return [{"message": "No target files found, but pathway OK."}]
 
-        # 2. Read and parse all relevant log files
-        parsed_entries: List[ParsedLogEntry] = []
+        self.logger.info(f"[AnalysisEngine.search_logs] Target files found: {target_files}")
+
+        # 2. Parse all lines from target files
         for file_path in target_files:
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    all_raw_lines_by_file[file_path] = [line.rstrip("\n") for line in lines]  # Store for context
+                    # Store all lines for context extraction later
+                    all_raw_lines_by_file[file_path] = [
+                        line.rstrip("\\n") for line in lines
+                    ]  # Store raw lines as they are
                     for i, line_content in enumerate(lines):
-                        entry = self._parse_log_line(line_content.strip(), file_path, i + 1)
+                        entry = self._parse_log_line(line_content.strip(), file_path, i + 1)  # line_number is 1-indexed
                         if entry:
                             parsed_entries.append(entry)
             except Exception as e:  # pylint: disable=broad-exception-caught
-                print(f"Error reading or parsing file {file_path}: {e}")
-                continue  # Skip to the next file if one fails
+                self.logger.error(f"Error reading or parsing file {file_path}: {e}", exc_info=True)
+                continue  # Continue with other files
 
-        # 3. Apply content filters (Regex on message, or level-specific from config)
-        # This uses log_content_patterns_override or configured patterns
-        filtered_by_content = self._apply_content_filters(parsed_entries, filter_criteria)
+        self.logger.info(f"[AnalysisEngine.search_logs] Parsed {len(parsed_entries)} entries from all target files.")
+        if not parsed_entries:
+            self.logger.info("[AnalysisEngine.search_logs] No entries parsed from target files.")
+            return []
 
-        # 4. Apply level filter (if any)
-        level_filter = filter_criteria.get("level_filter")
-        if level_filter:
-            filtered_by_level = [entry for entry in filtered_by_content if entry["level"] == level_filter.upper()]
-            filtered_by_content = filtered_by_level
+        # 3. Apply content filters (level and regex)
+        filtered_entries = self._apply_content_filters(parsed_entries, filter_criteria)
+        if not filtered_entries:
+            self.logger.info("[AnalysisEngine.search_logs] No entries left after content filters.")
+            return []
 
-        # 5. Apply time filters
-        if any(key in filter_criteria for key in ["minutes", "hours", "days"]):
-            filtered_by_time = self._apply_time_filters(filtered_by_content, filter_criteria)
-        else:
-            filtered_by_time = filtered_by_content
+        # 4. Apply time filters
+        filtered_entries = self._apply_time_filters(filtered_entries, filter_criteria)
+        if not filtered_entries:
+            self.logger.info("[AnalysisEngine.search_logs] No entries left after time filters.")
+            return []
 
-        # 6. Apply positional filters (first_n, last_n)
-        if "first_n" in filter_criteria or "last_n" in filter_criteria:
-            filtered_by_position = self._apply_positional_filters(filtered_by_time, filter_criteria)
-        else:
-            filtered_by_position = filtered_by_time
+        # 5. Apply positional filters (first_n, last_n)
+        # Note: _apply_positional_filters sorts by timestamp and handles entries without timestamps
+        filtered_entries = self._apply_positional_filters(filtered_entries, filter_criteria)
+        if not filtered_entries:
+            self.logger.info("[AnalysisEngine.search_logs] No entries left after positional filters.")
+            return []
 
-        # 7. Extract context lines
-        entries_with_context = self._extract_context_lines(
-            filtered_by_position,
-            all_raw_lines_by_file,
-            filter_criteria.get("context_before", self.default_context_lines_before),
-            filter_criteria.get("context_after", self.default_context_lines_after),
+        # 6. Extract context lines for the final set of entries
+        # Use context_before and context_after from filter_criteria, or defaults from config
+        context_before = filter_criteria.get("context_before", self.default_context_lines_before)
+        context_after = filter_criteria.get("context_after", self.default_context_lines_after)
+
+        final_entries_with_context = self._extract_context_lines(
+            filtered_entries, all_raw_lines_by_file, context_before, context_after
         )
 
-        return entries_with_context
+        self.logger.info(f"[AnalysisEngine.search_logs] Returning {len(final_entries_with_context)} processed entries.")
+        # The tool expects a list of dicts, and ParsedLogEntry is already a Dict[str, Any]
+        return final_entries_with_context
 
 
 # TODO: Add helper functions for parsing, filtering, file handling etc. as needed.

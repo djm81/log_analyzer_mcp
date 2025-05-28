@@ -9,6 +9,7 @@ tests/.coverage
 tests/coverage.xml
 tests/coverage_html_report/
 tests/htmlcov/
+test_data/
 
 # Python cache files
 __pycache__/
@@ -32,6 +33,10 @@ test_logs/
 .env
 .env.*
 !.env.template
+.cursor/mcp.json
+
+# Data files
+dist/
 
 # IDE files
 .vscode/

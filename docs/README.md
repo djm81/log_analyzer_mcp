@@ -1,93 +1,45 @@
-# Log Analyzer MCP
+# Log Analyzer MCP Documentation
 
-## Overview
+Welcome to the documentation for **Log Analyzer MCP**, a powerful Python-based toolkit for log analysis, offering both a Command-Line Interface (CLI) and a Model-Context-Protocol (MCP) server.
 
-**Log Analyzer MCP** is a specialized Model-Context-Protocol (MCP) server designed to integrate with Cursor. It provides tools for analyzing test logs, runtime errors, and code coverage reports, streamlining the development and debugging workflow.
+This documentation provides guides for users, integrators, and developers.
 
-The system is built with Python, utilizing `hatch` for project management and `pytest` for testing. It's designed to be robust and provide actionable insights from various log and report files.
+## Key Documentation Sections
 
-## Key Features
+- **[Getting Started Guide](./getting_started.md)**
+  - Learn how to install and use the `loganalyzer` CLI.
+  - Understand how to integrate the MCP server with client applications like Cursor.
 
-- **MCP Server Implementation**: Provides a suite of tools accessible via the Model-Context-Protocol.
-- **Test Log Analysis**: Parses `pytest` output to summarize test results, identify failures, and extract error details.
-- **Runtime Error Analysis**: Scans application runtime logs to find and contextualize errors based on execution IDs.
-- **Code Coverage Reporting**: Generates and parses code coverage reports (XML format) to provide insights into test effectiveness.
-- **Hatch Integration**: Uses `hatch` for dependency management, environment control, and running tests/coverage.
-- **Subprocess Coverage**: Includes mechanisms to capture code coverage from subprocesses started by the MCP server tools.
+- **[Developer Guide](./developer_guide.md)**
+  - Detailed instructions for setting up the development environment, building the project, running tests, managing MCP server configurations for development, and release procedures.
 
-## Getting Started
+- **[Refactoring Plans](./refactoring/README.md)**
+  - Technical details and status of ongoing and past refactoring efforts for the project.
+    - [Current Plan: Refactoring Plan v2](./refactoring/log_analyzer_refactoring_v2.md)
 
-This project uses `hatch` for environment and project management.
+- **[Project Rules and Guidelines](./rules/README.md)**
+  - Information on coding standards, Markdown linting, Python development practices, and GitHub workflows used in this project.
 
-1. **Install Hatch:**
-    Follow the instructions on the [official Hatch website](https://hatch.pypa.io/latest/install/).
+- **(Upcoming) Configuration Guide**
+  - Will provide a detailed explanation of all `.env` and environment variable settings for configuring the Log Analyzer.
 
-2. **Clone the repository:**
-    (Instructions assume you are in the parent directory of where you want to clone)
+- **(Upcoming) CLI Usage Guide**
+  - Will offer a comprehensive guide to all `loganalyzer` commands, options, and usage patterns.
 
-    ```bash
-    git clone <repository-url>
-    cd log_analyzer_mcp
-    ```
+## Project Overview
 
-3. **Activate the Hatch environment (from project root):**
+Log Analyzer MCP aims to:
 
-    ```bash
-    hatch shell
-    ```
+- Simplify the analysis of complex log files.
+- Provide flexible searching and filtering capabilities.
+- Integrate seamlessly into developer workflows via its CLI and MCP server.
 
-    This will create a virtual environment and install all dependencies if it's the first time.
-
-4. **Run Tests (from project root):**
-
-    ```bash
-    hatch test
-    ```
-
-5. **Run Tests with Coverage (from project root):**
-
-    ```bash
-    hatch test --cover -v
-    ```
-
-For more detailed information on development, testing, and refactoring, please refer to our documentation within this `docs` folder:
-
-- **[Refactoring Plan](./refactoring/log_analyzer_refactoring_v1.md)**
-- **[Testing Overview](./testing/README.md)**
-
-## MCP Server Tools
-
-The server provides tools such as:
-
-- `ping`: Checks server status.
-- `analyze_tests`: Analyzes test logs.
-- `run_tests_no_verbosity`, `run_tests_verbose`: Runs tests with different verbosity.
-- `run_unit_test`: Runs specific unit tests.
-- `analyze_runtime_errors`: Analyzes runtime application logs.
-- `create_coverage_report`: Generates coverage XML.
-- `get_coverage_report`: Parses and returns coverage data.
-
-(Refer to `docs/testing/README.md` (i.e., `./testing/README.md`) for more details on server tools, though this file might need an update to reflect the current state precisely).
+For a higher-level overview of the project, its unique selling points, and quick installation for MCP integration, please see the main [Project README.md](../README.md).
 
 ## Contributing
 
-Please see `CONTRIBUTING.md` (located in the project root) for guidelines.
+If you're interested in contributing to the project, please start by reading the [Developer Guide](./developer_guide.md) and the [CONTRIBUTING.md](../CONTRIBUTING.md) file in the project root.
 
 ## License
 
-Chroma MCP Server is licensed under the MIT License with Commons Clause. This means you can:
-
-✅ **Allowed**:
-
-- Use Log Analyzer MCP for any purpose (personal, commercial, academic)
-- Modify the code
-- Distribute copies
-- Create and sell products built using Log Analyzer MCP
-
-❌ **Not Allowed**:
-
-- Sell Log Analyzer MCP itself
-- Offer Log Analyzer MCP as a hosted service
-- Create competing products based on Log Analyzer MCP
-
-See the [LICENSE.md](LICENSE.md) file for the complete license text.
+Log Analyzer MCP is licensed under the MIT License with Commons Clause. See the [LICENSE.md](../LICENSE.md) file in the project root for details.
