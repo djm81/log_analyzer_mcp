@@ -20,10 +20,30 @@ from typing import Any, Dict, Literal, Optional
 
 # Determine the project root directory from the location of this script
 # Expected structure: /project_root/src/log_analyzer_mcp/common/logger_setup.py
-_common_dir = os.path.dirname(os.path.abspath(__file__))
-_log_analyzer_mcp_dir = os.path.dirname(_common_dir)
-_src_dir = os.path.dirname(_log_analyzer_mcp_dir)
-PROJECT_ROOT = os.path.dirname(_src_dir)
+# _common_dir = os.path.dirname(os.path.abspath(__file__))
+# _log_analyzer_mcp_dir = os.path.dirname(_common_dir)
+# _src_dir = os.path.dirname(_log_analyzer_mcp_dir)
+# PROJECT_ROOT = os.path.dirname(_src_dir) # Old method
+
+
+def find_project_root(start_path: str, marker_file: str = "pyproject.toml") -> str:
+    """Searches upwards from start_path for a directory containing marker_file."""
+    current_path = os.path.abspath(start_path)
+    while True:
+        if os.path.exists(os.path.join(current_path, marker_file)):
+            return current_path
+        parent_path = os.path.dirname(current_path)
+        if parent_path == current_path:  # Reached filesystem root
+            # Fallback to a less reliable method if pyproject.toml not found
+            # This could happen if script is run from outside a typical project structure
+            # Default to 3 levels up from current file, similar to old logic but from __file__ directly
+            fallback_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            sys.stderr.write(f"Warning: '{marker_file}' not found. Falling back to project root: {fallback_root}\n")
+            return fallback_root
+        current_path = parent_path
+
+
+PROJECT_ROOT = find_project_root(os.path.abspath(__file__))
 
 # Define the base logs directory at the project root
 LOGS_BASE_DIR = os.path.join(PROJECT_ROOT, "logs")
@@ -244,33 +264,38 @@ class LoggerSetup:
 
         # Create file handler if log_file is provided
         if log_file:
-            # If log_file is just a filename, put it in the centralized logs directory
-            if not os.path.isabs(log_file) and not os.path.dirname(log_file):
-                logs_dir = get_logs_dir()
-                log_file = os.path.join(logs_dir, log_file)
+            actual_log_file_path = ""
+            if os.path.isabs(log_file):
+                actual_log_file_path = log_file  # Trust absolute path
             else:
-                # Make sure we use the proper logs directory even for paths with directories
-                logs_dir = get_logs_dir()
+                # It's a relative path or just a filename, place it in get_logs_dir()
+                logs_dir = get_logs_dir()  # This uses the (potentially still imperfect) PROJECT_ROOT
+                actual_log_file_path = os.path.join(logs_dir, log_file)
 
-                # If the log_file has a path but it's not in the logs directory, put it in the logs directory
-                if os.path.dirname(log_file) and not log_file.startswith(logs_dir):
-                    log_file = os.path.join(logs_dir, os.path.basename(log_file))
+            # Ensure the directory for the final log file exists
+            log_file_dir = os.path.dirname(actual_log_file_path)
+            if log_file_dir and not os.path.exists(log_file_dir):
+                try:
+                    os.makedirs(log_file_dir, exist_ok=True)
+                except OSError as e:
+                    # Log to stderr if we can't create the dir, as the file handler will likely fail
+                    sys.stderr.write(f"ERROR: Could not create log directory {log_file_dir}: {e}\n")
+                    # Return logger without file handler if dir creation fails
+                    cls._active_loggers[name] = logger
+                    return logger
 
-                # If a path is provided, ensure the directory exists
-                log_dir = os.path.dirname(log_file)
-                if log_dir and not os.path.exists(log_dir):
-                    os.makedirs(log_dir, exist_ok=True)
-
-            logger.info("Logging to file: %s", log_file)
+            # This logger.info will use the console handler to state where it *intends* to write for the file handler.
+            logger.info("File logging configured for: %s", actual_log_file_path)
 
             # Choose the appropriate file handler based on use_rotating_file
+            file_mode = "a" if append_mode else "w"
             if use_rotating_file:
                 file_handler = RotatingFileHandler(
-                    log_file, maxBytes=10 * 1024 * 1024, backupCount=5, mode="a" if append_mode else "w"  # 10MB
+                    actual_log_file_path, maxBytes=10 * 1024 * 1024, backupCount=5, mode=file_mode  # 10MB
                 )
             else:
                 # Use simple FileHandler for test scenarios
-                file_handler = logging.FileHandler(log_file, mode="a" if append_mode else "w")
+                file_handler = logging.FileHandler(actual_log_file_path, mode=file_mode)
 
             file_handler.setLevel(log_level_num)
             file_handler.setFormatter(test_formatter if preserve_test_format else message_flow_formatter)

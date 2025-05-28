@@ -1,34 +1,46 @@
 # src/log_analyzer_mcp/common/config_loader.py
 import os
 from typing import Any, Dict, List, Optional
+from pathlib import Path
+import logging
 
 from dotenv import load_dotenv
+from log_analyzer_mcp.common.logger_setup import find_project_root
 
 
 class ConfigLoader:
-    def __init__(self, env_file_path: Optional[str] = None, project_root: Optional[str] = None):
-        if project_root:
-            self.project_root = os.path.abspath(project_root)
-        else:
-            # Determine project root based on the location of this file
-            # Expected structure: /project_root/src/log_analyzer_mcp/common/config_loader.py
-            _common_dir = os.path.dirname(os.path.abspath(__file__))
-            _log_analyzer_mcp_dir = os.path.dirname(_common_dir)
-            _src_dir = os.path.dirname(_log_analyzer_mcp_dir)
-            self.project_root = os.path.dirname(_src_dir)
+    def __init__(self, env_file_path: Optional[str] = None, project_root_for_config: Optional[str] = None):
+        self.logger = logging.getLogger(__name__)
 
+        if project_root_for_config:
+            self.project_root = str(Path(project_root_for_config).resolve())
+        else:
+            self.project_root = str(find_project_root(str(Path.cwd())))
+
+        self.config_file_path: Optional[Path] = None
+
+        actual_env_path: Optional[Path] = None
         if env_file_path:
-            # If env_file_path is relative, make it absolute to project_root
-            if not os.path.isabs(env_file_path):
-                env_file_path = os.path.join(self.project_root, env_file_path)
-            load_dotenv(dotenv_path=env_file_path)
+            actual_env_path = Path(env_file_path)
+            if not actual_env_path.is_absolute():
+                actual_env_path = Path(self.project_root) / env_file_path
         else:
             # Default .env loading should also consider project_root
-            default_env_path = os.path.join(self.project_root, ".env")
-            if os.path.exists(default_env_path):
-                load_dotenv(dotenv_path=default_env_path)
+            default_env_path_in_project = Path(self.project_root) / ".env"
+            if default_env_path_in_project.exists():
+                actual_env_path = default_env_path_in_project
+
+        if actual_env_path and actual_env_path.exists():
+            load_dotenv(dotenv_path=actual_env_path)
+            self.logger.info(f"Loaded .env from {actual_env_path}")
+        elif not env_file_path:  # Only try default search if no specific path was given
+            loaded_default = load_dotenv()  # python-dotenv default search
+            if loaded_default:
+                self.logger.info("Loaded .env using python-dotenv default search.")
             else:
-                load_dotenv()  # Fallback to python-dotenv default search if .env not in project_root
+                self.logger.info(f"No .env file found at specified path or by default search.")
+        else:  # Specific env_file_path was given but not found
+            self.logger.warning(f"Specified .env file {env_file_path} (resolved to {actual_env_path}) not found.")
 
     def get_env(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         return os.getenv(key, default)

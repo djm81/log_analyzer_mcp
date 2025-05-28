@@ -3,6 +3,17 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2025-05-28
+
+**Fixed**:
+
+- Resolved `RuntimeError: Attempted to exit cancel scope in a different task than it was entered in` in the `server_session` fixture in `tests/log_analyzer_mcp/test_log_analyzer_mcp_server.py`. This involved reverting to a simpler fixture structure without an explicit `anyio.TaskGroup` and ensuring `anyio.fail_after` was correctly applied only around the `session.initialize()` call.
+- Addressed linter errors related to unknown import symbols in `src/log_analyzer_mcp/log_analyzer_mcp_server.py` by ensuring correct symbol availability after user reverted problematic `hatch fmt` changes.
+
+**Changed**:
+
+- Iteratively debugged and refactored the `server_session` fixture in `tests/log_analyzer_mcp/test_log_analyzer_mcp_server.py` to address `anyio` task scope errors, including attempts with `anyio.TaskGroup` before settling on the final fix.
+
 ## [0.1.2] - 2025-05-28
 
 **Changed**:
