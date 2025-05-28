@@ -54,7 +54,7 @@ The recommended way to run the MCP server in a production-like or stable integra
 
 This snippet shows how you might configure Cursor (or a similar client) to use the `log-analyzer-mcp` package installed from PyPI. The `uvx` command is a utility to run Python executables from dynamically created virtual environments.
 
-```json
+```jsonc
 {
   "mcpServers": {
     "log_analyzer_mcp_server_prod": {
