@@ -55,6 +55,9 @@ dependencies = [
     "pytz>=2025.1",
     "click>=8.1.0", # Added for CLI client
     "toml>=0.10.2",
+
+    # Second Brain Knowledge and Test-Driven Learning
+    "chroma-mcp-server[client,devtools]>=0.2.27"
 ]
 
 [project.optional-dependencies]
@@ -128,11 +131,10 @@ PYTEST_TIMEOUT = "180"
 
 [tool.hatch.envs.hatch-test.scripts]
 # Script executed by `hatch test`
-run = "pytest -v {env:HATCH_TEST_ARGS:} {args}"
+run = "pytest -v --junitxml=logs/tests/junit/test-results.xml {env:HATCH_TEST_ARGS:} {args}"
 
 # Script executed by `hatch test --cover`
-run-cov = "coverage run -m pytest -v {env:HATCH_TEST_ARGS:} {args}"
-
+run-cov = "coverage run -m pytest -v --junitxml=logs/tests/junit/test-results.xml {env:HATCH_TEST_ARGS:} {args}"
 # Script run after all tests complete when measuring coverage
 cov-combine = "coverage combine"
 
