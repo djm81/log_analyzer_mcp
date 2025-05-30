@@ -6,6 +6,7 @@ This documentation provides guides for users, integrators, and developers.
 
 ## Key Documentation Sections
 
+- **[API Reference](./api_reference.md):** Detailed reference for MCP server tools and CLI commands.
 - **[Getting Started Guide](./getting_started.md)**
   - Learn how to install and use the `log-analyzer` CLI.
   - Understand how to integrate the MCP server with client applications like Cursor.

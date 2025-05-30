@@ -77,6 +77,7 @@ To integrate the Log Analyzer MCP server with a client application (like Cursor)
 
 ## Documentation
 
+- **[API Reference](./docs/api_reference.md):** Detailed reference for MCP server tools and CLI commands.
 - **[Getting Started Guide](./docs/getting_started.md):** For users and integrators.
 - **[Developer Guide](./docs/developer_guide.md):** For contributors and those building from source.
 - **[Refactoring Plan](./docs/refactoring/log_analyzer_refactoring_v2.md):** Technical details on the ongoing evolution of the project.
