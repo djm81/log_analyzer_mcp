@@ -53,6 +53,22 @@ Using Hatch ensures:
 - Environment variables are properly set
 - Coverage reports are correctly generated
 
+### Check for `chroma_mcp` is available
+
+If the chroma-mcp / chroma_mcp MCP server is available, **always** add `--auto-capture-workflow` to the `hatch test` commands as **additional argument** to ensure we capture failed tests, their fixes and promote learning from errors.
+
+Example for full tests:
+
+```bash
+hatch test --cover -v --auto-capture-workflow
+```
+
+Example for specific tests of a sub-level directory:
+
+```bash
+hatch test --cover -v --auto-capture-workflow tests/log_analyzer_mcp/
+```
+
 ## Build Guidelines
 
 Build the package using either:
@@ -112,4 +128,4 @@ When preparing a new release or updating the version:
 4. Test the new version to ensure all changes work
 5. Complete Documentation
 
-For comprehensive instructions, refer to the [Developer Guide](../../docs/developer_guide.md).
+For comprehensive instructions, refer to the [Developer Guide](mdc:../../docs/developer_guide.md).

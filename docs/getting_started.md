@@ -8,7 +8,7 @@ Log Analyzer MCP is a powerful tool designed to parse, analyze, and search log f
 
 - A **Core Log Analysis Engine** for flexible log processing.
 - An **MCP Server** that exposes analysis capabilities to MCP-compatible clients (like Cursor).
-- A **`loganalyzer` CLI** for direct command-line interaction and scripting.
+- A **`log-analyzer` CLI** for direct command-line interaction and scripting.
 
 Key use cases include:
 
@@ -21,9 +21,9 @@ Key use cases include:
 - **Python**: Version 3.9 or higher.
 - **Hatch**: For package management and running development tasks if you are contributing or building from source. Installation instructions can be found on the [official Hatch website](https://hatch.pypa.io/latest/install/).
 
-## Using the `loganalyzer` CLI
+## Using the `log-analyzer` CLI
 
-If you have cloned the repository and set up the development environment (see [Developer Guide](./developer_guide.md)), the `loganalyzer` CLI is available within the Hatch shell.
+If you have cloned the repository and set up the development environment (see [Developer Guide](./developer_guide.md)), the `log-analyzer` CLI is available within the Hatch shell.
 
 ```bash
 # Activate the Hatch environment (if not already active)
@@ -31,16 +31,16 @@ cd path/to/log_analyzer_mcp # Navigate to the project root
 hatch shell
 
 # Now you can use the CLI
-loganalyzer --help
+log-analyzer --help
 
 # Example: Search all records in a specific log directory
 # (Configuration for log directories, patterns, etc., is typically done via a .env file or environment variables)
-loganalyzer search all --scope my_app_logs
+log-analyzer search all --scope my_app_logs
 ```
 
 For detailed CLI commands and options, refer to:
 
-- `loganalyzer --help`
+- `log-analyzer --help`
 - The upcoming CLI Usage Guide (link to be added once created).
 - The [Refactoring Plan](./refactoring/log_analyzer_refactoring_v2.md) for tool parameters which mirror CLI arguments.
 

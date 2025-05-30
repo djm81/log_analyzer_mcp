@@ -37,6 +37,8 @@ test_logs/
 
 # Data files
 dist/
+data/
+chroma_data/
 
 # IDE files
 .vscode/

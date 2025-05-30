@@ -69,12 +69,12 @@ This phase is considered complete as per `log_analyzer_refactoring_v1.md`. All i
 - [x] **Implement CLI (`src/log_analyzer_client/cli.py`):**
   - [x] Use `click` or `argparse` for the CLI interface.
   - [x] This CLI will also utilize the core analysis engine from `src/log_analyzer_mcp/core/`.
-  - [x] Create script aliases for CLI invocation (e.g., `loganalyzer`) via `pyproject.toml` `[project.scripts]`.
+  - [x] Create script aliases for CLI invocation (e.g., `log-analyzer`) via `pyproject.toml` `[project.scripts]`.
   - [x] Provide sub-commands that mirror the MCP server tools with feature parity:
-    - [x] `loganalyzer search all [--scope SCOPE] [--before LINES] [--after LINES]`
-    - [x] `loganalyzer search time [--minutes M] [--hours H] [--days D] [--scope SCOPE] [--before LINES] [--after LINES]`
-    - [x] `loganalyzer search first [--count N] [--scope SCOPE] [--before LINES] [--after LINES]`
-    - [x] `loganalyzer search last [--count N] [--scope SCOPE] [--before LINES] [--after LINES]`
+    - [x] `log-analyzer search all [--scope SCOPE] [--before LINES] [--after LINES]`
+    - [x] `log-analyzer search time [--minutes M] [--hours H] [--days D] [--scope SCOPE] [--before LINES] [--after LINES]`
+    - [x] `log-analyzer search first [--count N] [--scope SCOPE] [--before LINES] [--after LINES]`
+    - [x] `log-analyzer search last [--count N] [--scope SCOPE] [--before LINES] [--after LINES]`
   - [x] Allow all configuration options (log directories, patterns, etc.) to be overridden via CLI arguments if not using scopes from `.env`.
   - [x] Ensure CLI parameters also adhere to the non-Optional/Union type hinting rule where applicable for internal consistency.
 
@@ -100,24 +100,24 @@ This phase is considered complete as per `log_analyzer_refactoring_v1.md`. All i
   - [ ] Update `README.md` for the standalone project:
     - [ ] Installation instructions (using `hatch`), noting that it installs both MCP server components and the CLI client.
     - [ ] Detailed usage instructions for the MCP server tools.
-    - [ ] Detailed usage instructions for the CLI (`loganalyzer`), including all commands and options.
+    - [ ] Detailed usage instructions for the CLI (`log-analyzer`), including all commands and options.
     - [ ] Clear explanation of how to configure logging scopes, directories, patterns, and context lines using `.env` files and environment variables (relevant for both MCP server and CLI).
     - [ ] Examples for `.env` configuration.
     - [ ] How to run tests (covering both `tests/log_analyzer_mcp` and `tests/log_analyzer_client`) and check coverage.
   - [ ] Update `docs/refactoring/README.md` to link to this v2 plan.
-  - [ ] Create or update other documents in `docs/` as needed (e.g., `docs/usage.md`, `docs/configuration.md`, `docs/architecture.md` briefly explaining the client/server structure).
+  - [x] Create or update other documents in `docs/` as needed (e.g., `docs/usage.md`, `docs/configuration.md`, `docs/architecture.md` briefly explaining the client/server structure).
 - [x] **Linting and Formatting (Project-wide):**
   - [x] Run `black .` and `isort .` across `src/log_analyzer_mcp`, `src/log_analyzer_client`, `tests/log_analyzer_mcp`, `tests/log_analyzer_client`. (Done)
   - [ ] Run `pylint src tests` and address warnings/errors. (Skipped for now)
   - [ ] Run `mypy src tests` and address type errors, paying close attention to the new type hinting guidelines.
 - [x] **Build and Distribution:**
-  - [x] Verify `pyproject.toml` correctly defines `[project.scripts]` for the `loganalyzer` CLI. (Verified during CLI implementation)
-  - [ ] Test building a wheel: `hatch build`. Ensure both modules are included.
-  - [ ] If this package is intended for PyPI, ensure all metadata is correct.
+  - [x] Verify `pyproject.toml` correctly defines `[project.scripts]` for the `log-analyzer` CLI. (Verified during CLI implementation)
+  - [x] Test building a wheel: `hatch build`. Ensure both modules are included.
+  - [x] If this package is intended for PyPI, ensure all metadata is correct.
 - [ ] **Final Review:**
   - [ ] Review all changes and ensure the repository is clean, self-contained, and adheres to the new refactoring goals.
   - [ ] Ensure a consistent class hierarchy and code design is maintained, especially for shared components.
-  - [ ] Ensure all `.cursorrules` instructions are being followed.
+  - [x] Ensure all `.cursorrules` instructions are being followed.
   - [x] *Note on FastMCP: Consult the FastMCP documentation for any specific guidance on MCP server implementation details, especially regarding tool definitions and type handling, to ensure optimal compatibility. This can be fetched via the `mcp_FastMCP_Docs_fetch_fastmcp_documentation` tool if needed.* (Fetched)
 
 ## Deferred Tasks

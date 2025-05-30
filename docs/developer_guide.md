@@ -23,7 +23,7 @@ This project uses `hatch` for environment and project management.
     hatch shell
     ```
 
-    This command creates a virtual environment (if it doesn't exist) and installs all project dependencies defined in `pyproject.toml`. The `loganalyzer` CLI tool will also become available within this activated shell.
+    This command creates a virtual environment (if it doesn't exist) and installs all project dependencies defined in `pyproject.toml`. The `log-analyzer` CLI tool will also become available within this activated shell.
 
 ## Testing Guidelines
 
@@ -83,6 +83,38 @@ Standard tests should **always** be run via the built-in Hatch `test` command, n
     hatch test --cover -v tests/log_analyzer_mcp/
     ```
 
+### Integrating `chroma-mcp-server` for Enhanced Testing
+
+If the `chroma-mcp-server` package (included as a development dependency) is available in your Hatch environment, it enables an enhanced testing workflow. This is activated by adding the `--auto-capture-workflow` flag to your `hatch test` commands.
+
+**Purpose:**
+
+The primary benefit of this integration is to capture detailed information about test runs, including failures and subsequent fixes. This data can be used by `chroma-mcp-server` to build a knowledge base, facilitating "Test-Driven Learning" and helping to identify patterns or recurring issues.
+
+**How to Use:**
+
+When `chroma-mcp-server` is part of your development setup, modify your test commands as follows:
+
+- **Run all tests with auto-capture:**
+
+  ```bash
+  hatch test --auto-capture-workflow
+  ```
+
+- **Run tests with coverage, verbose output, and auto-capture:**
+
+  ```bash
+  hatch test --cover -v --auto-capture-workflow
+  ```
+
+- **Target specific tests with auto-capture:**
+
+  ```bash
+  hatch test --cover -v --auto-capture-workflow tests/log_analyzer_mcp/
+  ```
+
+By including `--auto-capture-workflow`, `pytest` (via a plugin provided by `chroma-mcp-server`) will automatically log the necessary details of the test session for further analysis and learning.
+
 ### Avoid Direct `pytest` Usage
 
 ❌ **Incorrect:**
@@ -121,7 +153,7 @@ Both methods generate the distributable files (e.g., `.whl` and `.tar.gz`) in th
 After making changes to the MCP server or CLI, you need to rebuild and reinstall the package within the Hatch environment for those changes to be reflected when:
 
 - Cursor (or another IDE) runs the MCP server.
-- You use the `loganalyzer` CLI directly.
+- You use the `log-analyzer` CLI directly.
 
 **Steps:**
 

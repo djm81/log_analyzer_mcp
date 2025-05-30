@@ -1,5 +1,7 @@
 # src/log_analyzer_client/cli.py
 import json
+import logging
+import sys
 
 import click
 
@@ -13,6 +15,20 @@ from log_analyzer_mcp.core.analysis_engine import AnalysisEngine
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 
+# Create a simple logger for the CLI
+# This logger will output to stdout by default.
+# More sophisticated logging (e.g., to a file, configurable levels) can be added later if needed.
+def get_cli_logger():
+    logger = logging.getLogger("LogAnalyzerCLI")
+    if not logger.handlers:  # Avoid adding multiple handlers if re-invoked (e.g. in tests)
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter("[%(levelname)s] %(message)s")  # Simple format
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    logger.setLevel(logging.INFO)  # Default level, can be made configurable
+    return logger
+
+
 # Global instance of AnalysisEngine for the CLI
 # The CLI can optionally take a path to a custom .env file.
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -23,8 +39,9 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 def cli(ctx, env_file):
     """Log Analyzer CLI - A tool to search and filter log files."""
     ctx.ensure_object(dict)
+    cli_logger = get_cli_logger()  # Get logger instance
     # Initialize AnalysisEngine with the specified .env file or default
-    ctx.obj["analysis_engine"] = AnalysisEngine(env_file_path=env_file)
+    ctx.obj["analysis_engine"] = AnalysisEngine(logger_instance=cli_logger, env_file_path=env_file)
     if env_file:
         click.echo(f"Using custom .env file: {env_file}")
 

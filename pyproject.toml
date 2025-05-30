@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "log_analyzer_mcp"
-version = "0.1.3"
+version = "0.1.5"
 description = "MCP server and tools for analyzing test and runtime logs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,44 +29,45 @@ classifiers = [
 ]
 dependencies = [
     # Core dependencies
-    "pydantic>=2.10.6",
-    "python-dotenv>=1.0.1",
+    "pydantic>=2.11.5",
+    "python-dotenv>=1.1.0",
     "requests>=2.32.3",
-    "typing-extensions>=4.12.2",
-    "PyYAML>=6.0.1",
-    "types-PyYAML>=6.0.12", # Keep this specific version for now
+    "typing-extensions>=4.13.2",
+    "PyYAML>=6.0.2",
+    "types-PyYAML>=6.0.12.20250516",
     
     # Structured output dependencies
-    "jsonschema>=4.23.0",
-    "pydantic-core>=2.27.2",
+    "jsonschema>=4.24.0",
+    "pydantic-core>=2.33.2",
     
     # Utility dependencies
-    "tenacity>=9.0.0",
-    "rich>=13.9.4",
+    "tenacity>=9.1.2",
+    "rich>=14.0.0",
     
     # Logging and monitoring
     "loguru>=0.7.3",
     
     # MCP Server SDK
-    "mcp>=1.4.1", # Keep existing version
+    "mcp>=1.9.1",
     
     # Environment/Utils
     "python-dateutil>=2.9.0.post0",
-    "pytz>=2025.1",
-    "click>=8.1.0", # Added for CLI client
+    "pytz>=2025.2",
+    "click>=8.2.1", # Updated from 8.1.0
     "toml>=0.10.2",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.5",
-    "pytest-cov",
-    "pytest-mock>=3.14.0",
+    "pytest-cov>=6.1.1",
+    "pytest-mock>=3.14.1",
     "mypy>=1.15.0",
     "black>=25.1.0",
     "isort>=6.0.1",
-    "pylint>=3.3.6",
-    "types-PyYAML>=6.0.12.20250402",
+    "pylint>=3.3.7",
+    "types-PyYAML>=6.0.12.20250516", # Match version in dependencies
+    "chroma-mcp-server[client,devtools]>=0.2.28"
 ]
 
 # Add other optional dependency groups from your original if they existed and are still needed (e.g., server, client, devtools, full from tpl)
@@ -76,17 +77,16 @@ Homepage = "https://github.com/nold-ai/log_analyzer_mcp" # Placeholder, update i
 Repository = "https://github.com/nold-ai/log_analyzer_mcp.git" # Placeholder
 Documentation = "https://github.com/nold-ai/log_analyzer_mcp#readme" # Placeholder, assuming it points to root README
 
-# [project.scripts] # Add if your project has CLI scripts
-# my-script = "log_analyzer_mcp.cli:main"
+[project.scripts]
+log-analyzer = "log_analyzer_client.cli:cli"
 
 # [project.entry-points."pytest11"] # Add if you have pytest plugins
-# log_analyzer_mcp_plugin = "log_analyzer_mcp.pytest_plugin"
 
 [tool.hatch.envs.default]
 features = ["dev"] # Add features if you have defined more optional-dependencies groups like 'server', 'client'
 dependencies = [
   # Add any default development/testing dependencies here not covered by 'dev' extras if needed
-  "coverage[toml]>=7.8.0"
+  "coverage[toml]>=7.8.2" # Updated from 7.8.0
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -111,14 +111,14 @@ start-dev-server = "python src/log_analyzer_mcp/log_analyzer_mcp_server.py"
 
 [tool.hatch.envs.hatch-test]
 dependencies = [
-  "pytest>=8.3.5", # Keep your project's pytest version
-  "pytest-mock>=3.14.0", # Keep your project's version
+  "pytest>=8.3.5",
+  "pytest-mock>=3.14.1", # Updated from 3.14.0
   # "trio>=0.29.0", # Add if you use trio for async tests
   # "pytest-trio>=0.8.0", # Add if you use trio for async tests
-  "pytest-asyncio>=0.26.0", # For handling async def tests, if you have them
-  "coverage[toml]>=7.8.0",
+  "pytest-asyncio>=1.0.0", # Updated from 0.26.0
+  "coverage[toml]>=7.8.2", # Updated from 7.8.0
   # "GitPython>=3.1.44", # Add if needed for tests
-  "pytest-timeout>=2.3.1", # Add pytest-timeout plugin
+  "pytest-timeout>=2.4.0", # Updated from 2.3.1
 ]
 dev-mode = true
 
@@ -128,11 +128,10 @@ PYTEST_TIMEOUT = "180"
 
 [tool.hatch.envs.hatch-test.scripts]
 # Script executed by `hatch test`
-run = "pytest -v {env:HATCH_TEST_ARGS:} {args}"
+run = "pytest -v --junitxml=logs/tests/junit/test-results.xml {env:HATCH_TEST_ARGS:} {args}"
 
 # Script executed by `hatch test --cover`
-run-cov = "coverage run -m pytest -v {env:HATCH_TEST_ARGS:} {args}"
-
+run-cov = "coverage run -m pytest -v --junitxml=logs/tests/junit/test-results.xml {env:HATCH_TEST_ARGS:} {args}"
 # Script run after all tests complete when measuring coverage
 cov-combine = "coverage combine"
 
@@ -227,7 +226,7 @@ exclude = '''
 
 [tool.isort]
 profile = "black"
-multi_line_output = 3 
+multi_line_output = 3
 line_length = 120 # From your original config
 
 [tool.mypy]
