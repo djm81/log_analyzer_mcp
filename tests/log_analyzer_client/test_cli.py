@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, ANY
 
 import pytest
 from click.testing import CliRunner
@@ -128,8 +128,8 @@ def test_cli_with_env_file(runner, mock_analysis_engine_class, mock_analysis_eng
 
         assert result.exit_code == 0
         assert "Using custom .env file: .env.test" in result.output
-        # Check that AnalysisEngine was initialized with the env_file_path
-        mock_analysis_engine_class.assert_called_once_with(env_file_path=".env.test")
+        # Check that AnalysisEngine was initialized with the env_file_path and a logger
+        mock_analysis_engine_class.assert_called_once_with(logger_instance=ANY, env_file_path=".env.test")
         mock_analysis_engine_instance.search_logs.assert_called_once()
 
 
