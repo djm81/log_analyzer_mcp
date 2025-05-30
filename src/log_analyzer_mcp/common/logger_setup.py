@@ -131,50 +131,41 @@ class MessageFlowFormatter(logging.Formatter):
         flow_match = self.FLOW_PATTERN.match(original_message)
         if flow_match:
             sender, receiver, message = flow_match.groups()
-
-            # Format the timestamp
             timestamp = self.formatTime(record, self.datefmt)
-
-            # Format the message with flow information and session ID if available
             if self.session_id:
                 formatted_message = f"{receiver} | {timestamp} | {self.session_id} | {sender} => {receiver} | {message}"
             else:
                 formatted_message = f"{receiver} | {timestamp} | {sender} => {receiver} | {message}"
-
-            # Override the message in the record
-            record.msg = formatted_message
-            record.args = ()
-
-            # Return the formatted message directly
-            return formatted_message
         else:
-            # Standard formatting for non-flow messages
             timestamp = self.formatTime(record, self.datefmt)
-
-            # Handle multiline messages
-            if self.preserve_newlines and "\n" in original_message:
-                lines = original_message.split("\n")
-                # Format the first line with the timestamp
+            if self.preserve_newlines:
+                # Preserve newlines: if newlines are present, split and format first line, append rest
+                if "\\n" in original_message:
+                    lines = original_message.split("\\n")
+                    if self.session_id:
+                        first_line = f"{self.agent_name} | {timestamp} | {self.session_id} | {lines[0]}"
+                    else:
+                        first_line = f"{self.agent_name} | {timestamp} | {lines[0]}"
+                    formatted_message = first_line + "\\n" + "\\n".join(lines[1:])
+                else: # No newlines, format as single line
+                    if self.session_id:
+                        formatted_message = f"{self.agent_name} | {timestamp} | {self.session_id} | {original_message}"
+                    else:
+                        formatted_message = f"{self.agent_name} | {timestamp} | {original_message}"
+            else:  # Not preserving newlines (preserve_newlines is False)
+                # Unconditionally replace newlines with spaces and format as a single line
+                processed_message = original_message.replace("\n", " ") # Replace actual newlines
+                processed_message = processed_message.replace("\\n", " ") # Also replace literal \\n, just in case
                 if self.session_id:
-                    first_line = f"{self.agent_name} | {timestamp} | {self.session_id} | {lines[0]}"
+                    formatted_message = f"{self.agent_name} | {timestamp} | {self.session_id} | {processed_message}"
                 else:
-                    first_line = f"{self.agent_name} | {timestamp} | {lines[0]}"
+                    formatted_message = f"{self.agent_name} | {timestamp} | {processed_message}"
 
-                # Return the first line and the rest as is
-                return first_line + "\n" + "\n".join(lines[1:])
-            else:
-                # Regular single-line message
-                if self.session_id:
-                    formatted_message = f"{self.agent_name} | {timestamp} | {self.session_id} | {original_message}"
-                else:
-                    formatted_message = f"{self.agent_name} | {timestamp} | {original_message}"
+        record.msg = formatted_message
+        record.args = ()
 
-                # Override the message in the record
-                record.msg = formatted_message
-                record.args = ()
-
-                # Return the formatted message
-                return formatted_message
+        # Return the formatted message
+        return formatted_message
 
 
 class LoggerSetup:
@@ -188,6 +179,39 @@ class LoggerSetup:
 
     # Store active loggers for management
     _active_loggers: Dict[str, logging.Logger] = {}
+
+    @classmethod
+    def _clear_and_close_handlers(cls, logger: logging.Logger):
+        """Helper to clear and close all handlers for a given logger."""
+        if logger.handlers:
+            for handler in list(logger.handlers): # Iterate over a copy
+                try:
+                    handler.flush()
+                    is_default_stream = False
+                    if isinstance(handler, logging.StreamHandler):
+                        stream = getattr(handler, 'stream', None) # Use getattr for safety
+                        if stream is sys.stdout or stream is sys.stderr:
+                            is_default_stream = True
+                            if stream is not None: 
+                                if hasattr(stream, 'fileno') and hasattr(sys.__stdout__, 'fileno'): 
+                                    if stream.fileno() != sys.__stdout__.fileno() and stream is sys.stdout: # type: ignore[attr-defined]
+                                        is_default_stream = False 
+                                if hasattr(stream, 'fileno') and hasattr(sys.__stderr__, 'fileno'): 
+                                    if stream.fileno() != sys.__stderr__.fileno() and stream is sys.stderr: # type: ignore[attr-defined]
+                                        is_default_stream = False 
+                    
+                    # Attempt to close if it has a close method and is not a default (non-file) stream handler
+                    if hasattr(handler, 'close'):
+                        if not (is_default_stream and not isinstance(handler, logging.FileHandler)):
+                            try:
+                                handler.close()
+                            except Exception: # Broad catch for mocks or unusual states during close
+                                pass 
+                except ValueError: 
+                    pass 
+                except Exception as e: 
+                    sys.stderr.write(f"Warning: Error during handler cleanup for {handler}: {e}\\n") 
+                logger.removeHandler(handler)
 
     @classmethod
     def get_logger(cls, name: str) -> Optional[logging.Logger]:
@@ -228,7 +252,19 @@ class LoggerSetup:
         log_level_num = getattr(logging, log_level_str, logging.INFO)
 
         # Use agent_name if provided, otherwise use the logger name
-        actual_agent_name = agent_name or name.lower().replace("agent", "_agent")
+        if agent_name:
+            actual_agent_name = agent_name
+        else:
+            base_name = name.lower()
+            if "logger" in base_name:
+                base_name = base_name.replace("logger", "")
+            if "agent" in base_name:
+                base_name = base_name.replace("agent", "")
+            base_name = base_name.strip("_") # Clean up dangling underscores
+            if not base_name: # if name was 'AgentLogger' or similar
+                actual_agent_name = "default_agent"
+            else:
+                actual_agent_name = f"{base_name}_agent"
 
         # Create or get existing logger
         logger = logging.getLogger(name)
@@ -237,82 +273,87 @@ class LoggerSetup:
         # Disable propagation to root logger to prevent duplicate logs
         logger.propagate = False
 
-        # Clear existing handlers to avoid duplicates
-        if logger.handlers:
-            # Properly close file handlers before clearing
-            for handler in logger.handlers:
-                # Force flush before closing
-                handler.flush()
-                # Close the handler, which will close any files
-                handler.close()
-            logger.handlers.clear()
+        # Clear existing handlers to avoid duplicates. This is crucial for overwrite mode.
+        # This must happen BEFORE adding new handlers, especially file handler in 'w' mode.
+        if name in cls._active_loggers:
+            # If logger exists in our tracking, it might have handlers we set up.
+            # We use the same logger instance, so clear its handlers.
+            cls._clear_and_close_handlers(logger) # logger is cls._active_loggers[name]
+        elif logger.hasHandlers(): 
+            # If not in _active_loggers but has handlers, it was configured elsewhere or is a pre-existing logger (e.g. root)
+            # Still important to clear to avoid duplication if we are taking it over.
+            cls._clear_and_close_handlers(logger)
 
-        # Create custom formatter
-        preserve_newlines = not preserve_test_format  # Don't preserve newlines for test output
-        message_flow_formatter = MessageFlowFormatter(
-            actual_agent_name, session_id=session_id, preserve_newlines=preserve_newlines
-        )
+        # Console Handler
+        console_formatter: logging.Formatter
+        if preserve_test_format:
+            # For test summaries, use standard formatter on console as well
+            # to avoid double formatting or MessageFlowFormatter specific handling
+            console_formatter = logging.Formatter(cls.LEGACY_LOG_FORMAT)
+        else:
+            console_formatter = MessageFlowFormatter(
+                actual_agent_name,
+                session_id=session_id,
+                preserve_newlines=not preserve_test_format,  # If preserving test format, don't preserve newlines for flow
+            )
 
-        # Special formatter for test output that preserves test format
-        test_formatter = logging.Formatter("%(message)s") if preserve_test_format else message_flow_formatter
-
-        # Create console handler
-        console_handler = logging.StreamHandler()
+        console_handler = logging.StreamHandler(sys.stdout)  # Use stdout for informational, stderr for errors
         console_handler.setLevel(log_level_num)
-        console_handler.setFormatter(message_flow_formatter)
+        console_handler.setFormatter(console_formatter)
         logger.addHandler(console_handler)
 
-        # Create file handler if log_file is provided
+        # File Handler
         if log_file:
-            actual_log_file_path = ""
+            # Determine the log file path
             if os.path.isabs(log_file):
-                actual_log_file_path = log_file  # Trust absolute path
+                log_file_path = log_file
             else:
-                # It's a relative path or just a filename, place it in get_logs_dir()
-                logs_dir = get_logs_dir()  # This uses the (potentially still imperfect) PROJECT_ROOT
-                actual_log_file_path = os.path.join(logs_dir, log_file)
+                log_file_path = os.path.join(get_logs_dir(), log_file)
 
-            # Ensure the directory for the final log file exists
-            log_file_dir = os.path.dirname(actual_log_file_path)
-            if log_file_dir and not os.path.exists(log_file_dir):
+            # Ensure log directory exists
+            log_dir = os.path.dirname(log_file_path)
+            if not os.path.exists(log_dir):
                 try:
-                    os.makedirs(log_file_dir, exist_ok=True)
+                    os.makedirs(log_dir, exist_ok=True)
                 except OSError as e:
-                    # Log to stderr if we can't create the dir, as the file handler will likely fail
-                    sys.stderr.write(f"ERROR: Could not create log directory {log_file_dir}: {e}\n")
-                    # Return logger without file handler if dir creation fails
-                    cls._active_loggers[name] = logger
-                    return logger
+                    sys.stderr.write(f"ERROR: Could not create log directory {log_dir}: {e}. File logging disabled.\\n")
+                    log_file = None  # Disable file logging
 
-            # This logger.info will use the console handler to state where it *intends* to write for the file handler.
-            logger.info("File logging configured for: %s", actual_log_file_path)
+            if log_file:  # Check again, might have been disabled
+                file_mode = "w" if not append_mode else "a"
+                file_formatter: logging.Formatter
+                if preserve_test_format:
+                    # Use a basic formatter for test log files to keep them clean
+                    file_formatter = logging.Formatter("%(message)s")
+                else:
+                    file_formatter = MessageFlowFormatter(
+                        actual_agent_name,
+                        session_id=session_id,
+                        preserve_newlines=True,  # Always preserve newlines in file logs unless test format
+                    )
 
-            # Choose the appropriate file handler based on use_rotating_file
-            file_mode = "a" if append_mode else "w"
-            if use_rotating_file:
-                file_handler = RotatingFileHandler(
-                    actual_log_file_path, maxBytes=10 * 1024 * 1024, backupCount=5, mode=file_mode  # 10MB
-                )
-            else:
-                # Use simple FileHandler for test scenarios
-                file_handler = logging.FileHandler(actual_log_file_path, mode=file_mode)
+                if use_rotating_file:
+                    file_handler: logging.Handler = RotatingFileHandler(
+                        log_file_path, maxBytes=10 * 1024 * 1024, backupCount=5, mode=file_mode, encoding="utf-8"
+                    )
+                else:
+                    file_handler = logging.FileHandler(log_file_path, mode=file_mode, encoding="utf-8")
+                
+                file_handler.setFormatter(file_formatter)
+                file_handler.setLevel(log_level_num)
+                logger.addHandler(file_handler)
+                # Log file configuration message to the logger itself
+                logger.info(f"File logging configured for: {log_file_path}")
 
-            file_handler.setLevel(log_level_num)
-            file_handler.setFormatter(test_formatter if preserve_test_format else message_flow_formatter)
-            logger.addHandler(file_handler)
 
-        # Store the logger in active loggers dictionary
         cls._active_loggers[name] = logger
-
         return logger
 
     @classmethod
     def flush_all_loggers(cls) -> None:
-        """
-        Flush all active loggers to ensure their output is written
-        """
-        for logger_name, logger in cls._active_loggers.items():
-            for handler in logger.handlers:
+        """Flushes all registered active loggers."""
+        for logger_instance in cls._active_loggers.values():
+            for handler in logger_instance.handlers:
                 handler.flush()
 
     @classmethod
@@ -373,6 +414,16 @@ class LoggerSetup:
         # Ensure everything is written
         for handler in logger.handlers:
             handler.flush()
+
+    @classmethod
+    def reset_loggers_for_testing(cls):
+        """Resets all loggers, closing their handlers. For test use only."""
+        for logger_name in list(cls._active_loggers.keys()):
+            logger = cls._active_loggers.pop(logger_name)
+            cls._clear_and_close_handlers(logger)
+        # Also clear the root logger's handlers if any were added inadvertently by tests
+        root_logger = logging.getLogger()
+        cls._clear_and_close_handlers(root_logger)
 
 
 def setup_logger(

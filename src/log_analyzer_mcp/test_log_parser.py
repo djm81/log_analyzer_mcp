@@ -49,7 +49,8 @@ def extract_failed_tests(log_contents: str) -> List[Dict[str, Any]]:
             test_failures = re.findall(failed_test_pattern, pytest_output)
 
             for test_file, test_name in test_failures:
-                module = test_file.split("/")[1] if "/" in test_file else "Unit Tests"
+                module_full_name = test_file.split("/")[1] if "/" in test_file else "Unit Tests"
+                module = module_full_name.replace(".py", "") if module_full_name != "Unit Tests" else "Unit Tests"
                 failed_tests.append({"module": module, "test_file": test_file, "test_name": test_name})
 
     # Third attempt: Look for FAILED markers in the log
@@ -58,7 +59,8 @@ def extract_failed_tests(log_contents: str) -> List[Dict[str, Any]]:
         all_failures = re.findall(failed_pattern, log_contents)
 
         for test_file, test_name in all_failures:
-            module = test_file.split("/")[1] if "/" in test_file else "Unit Tests"
+            module_full_name = test_file.split("/")[1] if "/" in test_file else "Unit Tests"
+            module = module_full_name.replace(".py", "") if module_full_name != "Unit Tests" else "Unit Tests"
             failed_tests.append({"module": module, "test_file": test_file, "test_name": test_name})
 
     return failed_tests
@@ -81,13 +83,13 @@ def extract_overall_summary(log_contents: str) -> Dict[str, Any]:
     # Example: "============ 1 failed, 10 passed, 2 skipped in 0.05s ============"
     # Example: "=============== 819 passed, 13 skipped in 11.01s ==============="
     summary_patterns = [
-        r"==+ (?:(\d+) failed, )?(?:(\d+) passed, )?(?:(\d+) skipped, )?(?:(\d+) xfailed, )?(?:(\d+) xpassed, )?(?:(\d+) error(?:s)?)? in ([\d\.]+)s ==+",
-        r"==+ (?:(\d+) passed, )?(?:(\d+) failed, )?(?:(\d+) skipped, )?(?:(\d+) xfailed, )?(?:(\d+) xpassed, )?(?:(\d+) error(?:s)?)? in ([\d\.]+)s ==+",
+        r"==+ (?:(\d+) failed(?:, )?)?(?:(\d+) passed(?:, )?)?(?:(\d+) skipped(?:, )?)?(?:(\d+) xfailed(?:, )?)?(?:(\d+) xpassed(?:, )?)?(?:(\d+) error(?:s)?(?:, )?)? in ([\d\.]+)s ={10,}",
+        r"==+ (?:(\d+) passed(?:, )?)?(?:(\d+) failed(?:, )?)?(?:(\d+) skipped(?:, )?)?(?:(\d+) xfailed(?:, )?)?(?:(\d+) xpassed(?:, )?)?(?:(\d+) error(?:s)?(?:, )?)? in ([\d\.]+)s ={10,}",
         # Simpler patterns if some elements are missing
-        r"==+ (\d+) failed, (\d+) passed in ([\d\.]+)s ==+",
-        r"==+ (\d+) passed in ([\d\.]+)s ==+",
-        r"==+ (\d+) failed in ([\d\.]+)s ==+",
-        r"==+ (\d+) skipped in ([\d\.]+)s ==+",
+        r"==+ (\d+) failed, (\d+) passed in ([\d\.]+)s ={10,}",
+        r"==+ (\d+) passed in ([\d\.]+)s ={10,}",
+        r"==+ (\d+) failed in ([\d\.]+)s ={10,}",
+        r"==+ (\d+) skipped in ([\d\.]+)s ={10,}",
     ]
 
     # Search for summary lines in reverse to get the last one (most relevant)

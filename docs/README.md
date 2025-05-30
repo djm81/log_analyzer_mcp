@@ -7,7 +7,7 @@ This documentation provides guides for users, integrators, and developers.
 ## Key Documentation Sections
 
 - **[Getting Started Guide](./getting_started.md)**
-  - Learn how to install and use the `loganalyzer` CLI.
+  - Learn how to install and use the `log-analyzer` CLI.
   - Understand how to integrate the MCP server with client applications like Cursor.
 
 - **[Developer Guide](./developer_guide.md)**
@@ -24,7 +24,7 @@ This documentation provides guides for users, integrators, and developers.
   - Will provide a detailed explanation of all `.env` and environment variable settings for configuring the Log Analyzer.
 
 - **(Upcoming) CLI Usage Guide**
-  - Will offer a comprehensive guide to all `loganalyzer` commands, options, and usage patterns.
+  - Will offer a comprehensive guide to all `log-analyzer` commands, options, and usage patterns.
 
 ## Project Overview
 

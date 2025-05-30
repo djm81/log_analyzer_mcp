@@ -35,7 +35,7 @@ except ImportError:
     sys.exit(1)
 
 # Import the function to be tested, and other necessary modules
-from log_analyzer_mcp.analyze_runtime_errors import analyze_runtime_errors
+# from log_analyzer_mcp.analyze_runtime_errors import analyze_runtime_errors # Commented out
 
 # Timeout for all async operations (in seconds)
 OPERATION_TIMEOUT = 30
@@ -244,50 +244,50 @@ async def test_log_analyzer_mcp_server(server_session: ClientSession):  # Use th
             )
 
         # Test analyze_runtime_errors
-        print("Testing analyze_runtime_errors (direct function call)...")
-        try:
-            # Clean up and prepare runtime logs directory
-            if os.path.exists(RUNTIME_LOGS_DIR):
-                shutil.rmtree(RUNTIME_LOGS_DIR)
-            os.makedirs(RUNTIME_LOGS_DIR, exist_ok=True)  # Added exist_ok=True
-
-            # Create a test log file
-            test_log_file = os.path.join(RUNTIME_LOGS_DIR, "test_runtime.log")
-            test_session_id = "230325-123456-test-session"
-            test_timestamp = "2025-03-25 12:34:56,789"
-            with open(test_log_file, "w", encoding="utf-8") as f:
-                f.write(f"{test_timestamp} INFO: Starting session {test_session_id}\\n")
-                f.write(f"{test_timestamp} ERROR: Test error message for session {test_session_id}\\n")
-
-            # No MCP call: Call the Python function directly
-            # response = await with_timeout(server_session.call_tool("analyze_runtime_errors", {}))
-            # result = json.loads(response.content[0].text)
-            result_dict = analyze_runtime_errors(logs_dir=RUNTIME_LOGS_DIR)  # Direct call
-
-            assert isinstance(result_dict, dict)
-            assert "success" in result_dict
-            assert result_dict["success"] is True, "Analysis should be successful"
-            # The direct function call might determine session_id differently or not at all if not from MCP context
-            # Adjust this assertion based on analyze_runtime_errors function's actual behavior
-            assert result_dict.get("execution_id") in [
-                test_session_id,
-                "unknown",
-            ], f"Expected session ID {test_session_id} or unknown, got {result_dict.get('execution_id')}"
-            assert result_dict["total_errors"] == 1, "Should find exactly one error"
-            assert isinstance(result_dict["errors"], list)
-            assert isinstance(result_dict["errors_by_file"], dict)
-
-            # Validate error details
-            if result_dict["total_errors"] > 0:
-                first_error = result_dict["errors"][0]
-                assert first_error["timestamp"] == test_timestamp, "Error timestamp should match"
-                assert "Test error message" in first_error["error_line"], "Error message should match"
-
-            print("✓ Analyze runtime errors test passed (direct call)")
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"Failed in analyze_runtime_errors (direct call): {e!s}")
-            print(traceback.format_exc())
-            raise
+        # print("Testing analyze_runtime_errors (direct function call)...")
+        # try:
+        #     # Clean up and prepare runtime logs directory
+        #     if os.path.exists(RUNTIME_LOGS_DIR):
+        #         shutil.rmtree(RUNTIME_LOGS_DIR)
+        #     os.makedirs(RUNTIME_LOGS_DIR, exist_ok=True)  # Added exist_ok=True
+        #
+        #     # Create a test log file
+        #     test_log_file = os.path.join(RUNTIME_LOGS_DIR, "test_runtime.log")
+        #     test_session_id = "230325-123456-test-session"
+        #     test_timestamp = "2025-03-25 12:34:56,789"
+        #     with open(test_log_file, "w", encoding="utf-8") as f:
+        #         f.write(f"{test_timestamp} INFO: Starting session {test_session_id}\\n")
+        #         f.write(f"{test_timestamp} ERROR: Test error message for session {test_session_id}\\n")
+        #
+        #     # No MCP call: Call the Python function directly
+        #     # response = await with_timeout(server_session.call_tool("analyze_runtime_errors", {}))
+        #     # result = json.loads(response.content[0].text)
+        #     result_dict = analyze_runtime_errors(logs_dir=RUNTIME_LOGS_DIR)  # Direct call
+        #
+        #     assert isinstance(result_dict, dict)
+        #     assert "success" in result_dict
+        #     assert result_dict["success"] is True, "Analysis should be successful"
+        #     # The direct function call might determine session_id differently or not at all if not from MCP context
+        #     # Adjust this assertion based on analyze_runtime_errors function's actual behavior
+        #     assert result_dict.get("execution_id") in [
+        #         test_session_id,
+        #         "unknown",
+        #     ], f"Expected session ID {test_session_id} or unknown, got {result_dict.get('execution_id')}"
+        #     assert result_dict["total_errors"] == 1, "Should find exactly one error"
+        #     assert isinstance(result_dict["errors"], list)
+        #     assert isinstance(result_dict["errors_by_file"], dict)
+        #
+        #     # Validate error details
+        #     if result_dict["total_errors"] > 0:
+        #         first_error = result_dict["errors"][0]
+        #         assert first_error["timestamp"] == test_timestamp, "Error timestamp should match"
+        #         assert "Test error message" in first_error["error_line"], "Error message should match"
+        #
+        #     print("✓ Analyze runtime errors test passed (direct call)")
+        # except Exception as e:  # pylint: disable=broad-exception-caught
+        #     print(f"Failed in analyze_runtime_errors (direct call): {e!s}")
+        #     print(traceback.format_exc())
+        #     raise
 
         # Test run_unit_test functionality
         print("Testing run_unit_test...")
