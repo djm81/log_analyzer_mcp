@@ -6,6 +6,7 @@ Implements the Model Context Protocol (MCP) for Cursor to analyze test results.
 """
 
 import asyncio
+import anyio
 import os
 import re
 import subprocess
@@ -482,6 +483,8 @@ async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
     Returns:
         Dictionary containing execution results and report paths.
     """
+    import anyio
+
     logger.info("Running coverage generation using hatch (force_rebuild=%s)...", force_rebuild)
 
     coverage_xml_report_path = os.path.join(
@@ -520,18 +523,25 @@ async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
 
         current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
 
-        xml_process = subprocess.run(
-            hatch_xml_cmd, capture_output=True, text=True, cwd=current_project_root, check=False  # MODIFIED
-        )
-        xml_output_text = xml_process.stdout + xml_process.stderr
-        if xml_process.returncode == 0 and os.path.exists(coverage_xml_report_path):
+        # Use anyio.run_process for better async/await and cancellation handling
+        process = await anyio.run_process(
+            hatch_xml_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
+        )  # MODIFIED
+        stdout = process.stdout
+        stderr = process.stderr
+        xml_output_text = stdout + stderr
+        if process.returncode == 0 and os.path.exists(coverage_xml_report_path):
             logger.info("XML coverage report generated: %s", coverage_xml_report_path)
             xml_success = True
         else:
-            logger.error("'hatch run xml' failed. RC: %s. Output:\n%s", xml_process.returncode, xml_output_text)
+            logger.error(
+                "'hatch run xml' failed. RC: %s. Output:\\n%s",
+                process.returncode,
+                (process.stdout + process.stderr).decode("utf-8", errors="ignore"),
+            )  # Decode
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Exception during 'hatch run xml': %s", e)
-        xml_output_text = str(e)
+        xml_output_text = str(e).encode("utf-8")  # Ensure bytes for consistency if error
 
     # Step 3: Generate HTML report using hatch script
     logger.info("Step 3: Generating HTML coverage report with 'hatch run run-html'...")
@@ -544,18 +554,25 @@ async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
 
         current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
 
-        html_process = subprocess.run(
-            hatch_html_cmd, capture_output=True, text=True, cwd=current_project_root, check=False  # MODIFIED
-        )
-        html_output_text = html_process.stdout + html_process.stderr
-        if html_process.returncode == 0 and os.path.exists(coverage_html_index_path):
+        # Use anyio.run_process for better async/await and cancellation handling
+        process = await anyio.run_process(
+            hatch_html_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
+        )  # MODIFIED
+        stdout = process.stdout
+        stderr = process.stderr
+        html_output_text = stdout + stderr
+        if process.returncode == 0 and os.path.exists(coverage_html_index_path):
             logger.info("HTML coverage report generated in: %s", coverage_html_report_dir)
             html_success = True
         else:
-            logger.error("'hatch run run-html' failed. RC: %s. Output:\n%s", html_process.returncode, html_output_text)
+            logger.error(
+                "'hatch run run-html' failed. RC: %s. Output:\\n%s",
+                process.returncode,
+                (process.stdout + process.stderr).decode("utf-8", errors="ignore"),
+            )  # Decode
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Exception during 'hatch run run-html': %s", e)
-        html_output_text = str(e)
+        html_output_text = str(e).encode("utf-8")  # Ensure bytes for consistency if error
 
     # Step 4: Get text summary report using hatch script
     logger.info("Step 4: Generating text coverage summary with 'hatch run default:cov-text-summary'...")
@@ -568,26 +585,33 @@ async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
 
         current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
 
-        summary_process = subprocess.run(
-            hatch_summary_cmd, capture_output=True, text=True, cwd=current_project_root, check=False  # MODIFIED
-        )
-        if summary_process.returncode == 0:
-            summary_output_text = summary_process.stdout + summary_process.stderr
+        # Use anyio.run_process for better async/await and cancellation handling
+        process = await anyio.run_process(
+            hatch_summary_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
+        )  # MODIFIED
+        # stdout = process.stdout # Not needed directly
+        # stderr = process.stderr # Not needed directly
+        # return_code = process.returncode # Not needed directly
+        if process.returncode == 0:
+            summary_output_text_bytes = process.stdout + process.stderr
+            summary_output_text = summary_output_text_bytes.decode("utf-8", errors="ignore")  # Decode once
             logger.info(
-                "Text coverage summary command executed. Captured output (first 500 chars):\n%s",
-                summary_output_text[:500],
+                "Text coverage summary command executed. Captured output (first 500 chars):\\n%s",
+                summary_output_text[:500],  # Use decoded string
             )
             summary_success = True
         else:
+            summary_output_text_bytes = process.stdout + process.stderr
+            summary_output_text = summary_output_text_bytes.decode("utf-8", errors="ignore")  # Decode for logging
             logger.error(
-                "'hatch run default:cov-text-summary' failed. RC: %s. Output:\n%s",
-                summary_process.returncode,
-                summary_process.stdout + summary_process.stderr,
+                "'hatch run default:cov-text-summary' failed. RC: %s. Output:\\n%s",
+                process.returncode,  # Use process.returncode
+                summary_output_text,  # Use decoded string
             )
-            summary_output_text = summary_process.stdout + summary_process.stderr  # Still provide output
+            # summary_output_text = summary_output_text_bytes  # Keep as bytes if needed elsewhere, or ensure consistent type
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Exception during 'hatch run default:cov-text-summary': %s", e)
-        summary_output_text = str(e)
+        summary_output_text = str(e)  # Ensure string for consistency if error
 
     final_success = xml_success and html_success and summary_success
     overall_message = (
@@ -597,7 +621,10 @@ async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
     # Try to parse overall coverage percentage from the text summary for convenience
     overall_coverage_percent = None
     if summary_success:
-        match = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", summary_output_text)
+        # Ensure summary_output_text is a string for re.search
+        # summary_str = summary_output_text.decode('utf-8', errors='ignore') if isinstance(summary_output_text, bytes) else summary_output_text
+        # The variable summary_output_text should be string type by now if summary_success is true.
+        match = re.search(r"TOTAL\\s+\\d+\\s+\\d+\\s+(\\d+)%", summary_output_text)  # Use summary_output_text directly
         if match:
             overall_coverage_percent = int(match.group(1))
             logger.info("Extracted overall coverage: %s%%", overall_coverage_percent)
@@ -610,8 +637,14 @@ async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
         "coverage_html_dir": coverage_html_report_dir if html_success else None,
         "coverage_html_index": coverage_html_index_path if html_success else None,
         "text_summary_output": summary_output_text,
-        "hatch_xml_output": xml_output_text,
-        "hatch_html_output": html_output_text,
+        "hatch_xml_output": (
+            xml_output_text.decode("utf-8", errors="ignore") if isinstance(xml_output_text, bytes) else xml_output_text
+        ),  # Decode for return
+        "hatch_html_output": (
+            html_output_text.decode("utf-8", errors="ignore")
+            if isinstance(html_output_text, bytes)
+            else html_output_text
+        ),  # Decode for return
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -913,6 +946,30 @@ async def get_server_env_details() -> dict[str, Any]:
     return details
 
 
+@mcp.tool()
+async def request_server_shutdown() -> str:
+    """Requests the MCP server to shut down gracefully by calling sys.exit(0) after a delay."""
+    logger.info("Server shutdown requested. Scheduling sys.exit(0) after a short delay.")
+
+    loop = asyncio.get_event_loop()
+
+    async def do_shutdown_soon():
+        await asyncio.sleep(0.1)  # Ensure response is sent before exit
+        logger.info("Attempting to call sys.exit(0) via loop.call_soon_threadsafe.")
+        # Using call_soon_threadsafe is generally for calling from another thread,
+        # but it's a robust way to schedule something on the loop.
+        # For a single-threaded asyncio app, call_soon would also work.
+        # If mcp.run() runs its own loop or integrates differently, this might be safer.
+        loop.call_soon_threadsafe(sys.exit, 0)
+        # If sys.exit(0) from here doesn't work as expected with mcp.run(),
+        # we might need to explore mcp's internal signal handling if any, or rely on KeyboardInterrupt
+        # and fix the client side.
+
+    asyncio.create_task(do_shutdown_soon())
+
+    return "Shutdown initiated (sys.exit(0) scheduled). Server should terminate shortly."
+
+
 if __name__ == "__main__":
     logger.info("Script started with Python %s", sys.version)
     logger.info("Current working directory: %s", os.getcwd())
@@ -937,6 +994,7 @@ if __name__ == "__main__":
             "search_log_first_n_records",
             "search_log_last_n_records",
             "get_server_env_details",
+            "request_server_shutdown",
         ]
         logger.debug("Available tools (manually listed for logging): %s", ", ".join(known_tool_names))
 

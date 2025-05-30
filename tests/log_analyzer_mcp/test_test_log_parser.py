@@ -98,12 +98,13 @@ session duration: 0.11s
 tests/test_api.py::TestAPI::test_get_users PASSED (fixtures used: 'db_session', 'user_factory')
 tests/test_api.py::TestAPI::test_create_user FAILED (fixtures used: 'db_session', 'user_payload')
 1 failed, 1 passed, 2 skipped in 0.04s
-""" # This doesn't have the ===== border, tests fallback
+"""  # This doesn't have the ===== border, tests fallback
 
 LOG_NO_SUMMARY_LINE = """
 Some random output without a clear pytest summary.
 Maybe a crash before summary.
 """
+
 
 class TestExtractFailedTests:
     def test_no_failures(self):
@@ -125,7 +126,7 @@ class TestExtractFailedTests:
             }
         ]
         assert extract_failed_tests(LOG_WITH_DIRECT_FAILURES) == expected
-    
+
     def test_mixed_failures(self):
         # LOG_WITH_MIXED_FAILURES_AND_XFAIL_XPASS uses the third pattern (direct FAILED)
         expected = [
@@ -149,7 +150,10 @@ class TestExtractOverallSummary:
         assert summary["errors"] == 0
         assert summary["status"] == "PASSED"
         assert summary["duration_seconds"] == 0.05
-        assert summary["summary_line"] == "============================== 10 passed in 0.05s =============================="
+        assert (
+            summary["summary_line"]
+            == "============================== 10 passed in 0.05s =============================="
+        )
 
     def test_module_failures_summary(self):
         summary = extract_overall_summary(LOG_WITH_MODULE_FAILURES)
@@ -165,7 +169,9 @@ class TestExtractOverallSummary:
         assert summary["failed"] == 1
         assert summary["status"] == "FAILED"
         assert summary["duration_seconds"] == 0.02
-        assert summary["summary_line"] == "========================= 1 failed, 2 passed in 0.02s ========================="
+        assert (
+            summary["summary_line"] == "========================= 1 failed, 2 passed in 0.02s ========================="
+        )
 
     def test_mixed_failures_xpass_xfail_summary(self):
         summary = extract_overall_summary(LOG_WITH_MIXED_FAILURES_AND_XFAIL_XPASS)
@@ -177,7 +183,10 @@ class TestExtractOverallSummary:
         assert summary["errors"] == 0
         assert summary["status"] == "FAILED"
         assert summary["duration_seconds"] == 0.03
-        assert summary["summary_line"] == "=============== 1 failed, 2 passed, 1 xfailed, 1 xpassed in 0.03s =============="
+        assert (
+            summary["summary_line"]
+            == "=============== 1 failed, 2 passed, 1 xfailed, 1 xpassed in 0.03s =============="
+        )
 
     def test_only_skipped_summary(self):
         summary = extract_overall_summary(LOG_ONLY_SKIPPED)
@@ -186,15 +195,18 @@ class TestExtractOverallSummary:
         assert summary["skipped"] == 2
         assert summary["status"] == "SKIPPED"
         assert summary["duration_seconds"] == 0.01
-        assert summary["summary_line"] == "============================== 2 skipped in 0.01s =============================="
+        assert (
+            summary["summary_line"]
+            == "============================== 2 skipped in 0.01s =============================="
+        )
 
     def test_errors_summary(self):
         summary = extract_overall_summary(LOG_WITH_ERRORS)
         assert summary["passed"] == 0
-        assert summary["failed"] == 0 # Errors are not counted as failed tests by this parser for 'failed' key
+        assert summary["failed"] == 0  # Errors are not counted as failed tests by this parser for 'failed' key
         assert summary["skipped"] == 0
         assert summary["errors"] == 1
-        assert summary["status"] == "FAILED" # Status is FAILED due to errors
+        assert summary["status"] == "FAILED"  # Status is FAILED due to errors
         assert summary["duration_seconds"] == 0.01
         assert summary["summary_line"] == "========================= 1 error in 0.01s ========================="
 
@@ -203,12 +215,12 @@ class TestExtractOverallSummary:
         assert summary["passed"] == 1
         assert summary["failed"] == 1
         assert summary["skipped"] == 2
-        assert summary["xfailed"] == 0 # Not in this short summary example
-        assert summary["xpassed"] == 0 # Not in this short summary example
+        assert summary["xfailed"] == 0  # Not in this short summary example
+        assert summary["xpassed"] == 0  # Not in this short summary example
         assert summary["errors"] == 0
         assert summary["status"] == "FAILED"
         assert summary["duration_seconds"] == 0.04
-        assert summary["summary_line"] == "" # No main bordered summary line matched
+        assert summary["summary_line"] == ""  # No main bordered summary line matched
 
     def test_no_summary_line(self):
         summary = extract_overall_summary(LOG_NO_SUMMARY_LINE)

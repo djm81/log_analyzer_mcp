@@ -147,15 +147,15 @@ class MessageFlowFormatter(logging.Formatter):
                     else:
                         first_line = f"{self.agent_name} | {timestamp} | {lines[0]}"
                     formatted_message = first_line + "\\n" + "\\n".join(lines[1:])
-                else: # No newlines, format as single line
+                else:  # No newlines, format as single line
                     if self.session_id:
                         formatted_message = f"{self.agent_name} | {timestamp} | {self.session_id} | {original_message}"
                     else:
                         formatted_message = f"{self.agent_name} | {timestamp} | {original_message}"
             else:  # Not preserving newlines (preserve_newlines is False)
                 # Unconditionally replace newlines with spaces and format as a single line
-                processed_message = original_message.replace("\n", " ") # Replace actual newlines
-                processed_message = processed_message.replace("\\n", " ") # Also replace literal \\n, just in case
+                processed_message = original_message.replace("\n", " ")  # Replace actual newlines
+                processed_message = processed_message.replace("\\n", " ")  # Also replace literal \\n, just in case
                 if self.session_id:
                     formatted_message = f"{self.agent_name} | {timestamp} | {self.session_id} | {processed_message}"
                 else:
@@ -184,33 +184,33 @@ class LoggerSetup:
     def _clear_and_close_handlers(cls, logger: logging.Logger):
         """Helper to clear and close all handlers for a given logger."""
         if logger.handlers:
-            for handler in list(logger.handlers): # Iterate over a copy
+            for handler in list(logger.handlers):  # Iterate over a copy
                 try:
                     handler.flush()
                     is_default_stream = False
                     if isinstance(handler, logging.StreamHandler):
-                        stream = getattr(handler, 'stream', None) # Use getattr for safety
+                        stream = getattr(handler, "stream", None)  # Use getattr for safety
                         if stream is sys.stdout or stream is sys.stderr:
                             is_default_stream = True
-                            if stream is not None: 
-                                if hasattr(stream, 'fileno') and hasattr(sys.__stdout__, 'fileno'): 
-                                    if stream.fileno() != sys.__stdout__.fileno() and stream is sys.stdout: # type: ignore[attr-defined]
-                                        is_default_stream = False 
-                                if hasattr(stream, 'fileno') and hasattr(sys.__stderr__, 'fileno'): 
-                                    if stream.fileno() != sys.__stderr__.fileno() and stream is sys.stderr: # type: ignore[attr-defined]
-                                        is_default_stream = False 
-                    
+                            if stream is not None:
+                                if hasattr(stream, "fileno") and hasattr(sys.__stdout__, "fileno"):
+                                    if stream.fileno() != sys.__stdout__.fileno() and stream is sys.stdout:  # type: ignore[attr-defined]
+                                        is_default_stream = False
+                                if hasattr(stream, "fileno") and hasattr(sys.__stderr__, "fileno"):
+                                    if stream.fileno() != sys.__stderr__.fileno() and stream is sys.stderr:  # type: ignore[attr-defined]
+                                        is_default_stream = False
+
                     # Attempt to close if it has a close method and is not a default (non-file) stream handler
-                    if hasattr(handler, 'close'):
+                    if hasattr(handler, "close"):
                         if not (is_default_stream and not isinstance(handler, logging.FileHandler)):
                             try:
                                 handler.close()
-                            except Exception: # Broad catch for mocks or unusual states during close
-                                pass 
-                except ValueError: 
-                    pass 
-                except Exception as e: 
-                    sys.stderr.write(f"Warning: Error during handler cleanup for {handler}: {e}\\n") 
+                            except Exception:  # Broad catch for mocks or unusual states during close
+                                pass
+                except ValueError:
+                    pass
+                except Exception as e:
+                    sys.stderr.write(f"Warning: Error during handler cleanup for {handler}: {e}\\n")
                 logger.removeHandler(handler)
 
     @classmethod
@@ -260,8 +260,8 @@ class LoggerSetup:
                 base_name = base_name.replace("logger", "")
             if "agent" in base_name:
                 base_name = base_name.replace("agent", "")
-            base_name = base_name.strip("_") # Clean up dangling underscores
-            if not base_name: # if name was 'AgentLogger' or similar
+            base_name = base_name.strip("_")  # Clean up dangling underscores
+            if not base_name:  # if name was 'AgentLogger' or similar
                 actual_agent_name = "default_agent"
             else:
                 actual_agent_name = f"{base_name}_agent"
@@ -278,8 +278,8 @@ class LoggerSetup:
         if name in cls._active_loggers:
             # If logger exists in our tracking, it might have handlers we set up.
             # We use the same logger instance, so clear its handlers.
-            cls._clear_and_close_handlers(logger) # logger is cls._active_loggers[name]
-        elif logger.hasHandlers(): 
+            cls._clear_and_close_handlers(logger)  # logger is cls._active_loggers[name]
+        elif logger.hasHandlers():
             # If not in _active_loggers but has handlers, it was configured elsewhere or is a pre-existing logger (e.g. root)
             # Still important to clear to avoid duplication if we are taking it over.
             cls._clear_and_close_handlers(logger)
@@ -338,13 +338,12 @@ class LoggerSetup:
                     )
                 else:
                     file_handler = logging.FileHandler(log_file_path, mode=file_mode, encoding="utf-8")
-                
+
                 file_handler.setFormatter(file_formatter)
                 file_handler.setLevel(log_level_num)
                 logger.addHandler(file_handler)
                 # Log file configuration message to the logger itself
                 logger.info(f"File logging configured for: {log_file_path}")
-
 
         cls._active_loggers[name] = logger
         return logger
