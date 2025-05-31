@@ -26,6 +26,46 @@
   - Advanced log searching: all records, time-based, first/last N records.
 - **Hatch Integration:** For easy development, testing, and dependency management.
 
+## Installation
+
+This package can be installed from PyPI (once published) or directly from a local build for development purposes.
+
+### From PyPI (Recommended for Users)
+
+*(Once the package is published to PyPI)*
+
+```bash
+pip install log-analyzer-mcp
+```
+
+This will install the `loganalyzer` CLI tool and make the MCP server package available for integration.
+
+### From Local Build (For Developers or Testing)
+
+If you have cloned the repository and want to use your local changes:
+
+1. **Ensure Hatch is installed.** (See [Developer Guide](./docs/developer_guide.md#development-environment))
+2. **Build the package:**
+
+    ```bash
+    hatch build
+    ```
+
+    This creates wheel and sdist packages in the `dist/` directory.
+3. **Install the local build into your Hatch environment (or any other virtual environment):**
+    Replace `<version>` with the actual version from the generated wheel file (e.g., `0.2.7`).
+
+    ```bash
+    # If using Hatch environment:
+    hatch run pip uninstall log-analyzer-mcp -y && hatch run pip install dist/log_analyzer_mcp-<version>-py3-none-any.whl
+
+    # For other virtual environments:
+    # pip uninstall log-analyzer-mcp -y # (If previously installed)
+    # pip install dist/log_analyzer_mcp-<version>-py3-none-any.whl
+    ```
+
+    For IDEs like Cursor to pick up changes to the MCP server, you may need to manually reload the server in the IDE. See the [Developer Guide](./docs/developer_guide.md#installing-and-testing-local-builds-idecli) for details.
+
 ## Getting Started: Using Log Analyzer MCP
 
 There are two primary ways to use Log Analyzer MCP:
@@ -33,17 +73,34 @@ There are two primary ways to use Log Analyzer MCP:
 1. **As a Command-Line Tool (`loganalyzer`):**
     - Ideal for direct analysis, scripting, or quick checks.
     - Requires Python 3.9+.
-    - For installation and usage, please see the [Getting Started Guide](./docs/getting_started.md).
+    - For installation, see the [Installation](#installation) section above.
+    - For detailed usage, see the [CLI Usage Guide](./docs/cli_usage_guide.md) (upcoming) or the [API Reference for CLI commands](./docs/api_reference.md#cli-client-log-analyzer).
 
 2. **As an MCP Server (e.g., with Cursor):**
     - Integrates log analysis capabilities directly into your AI-assisted development environment.
-    - To install and configure the MCP server for use in a client like Cursor, follow the instructions below.
+    - For installation, see the [Installation](#installation) section. The MCP server component is included when you install the package.
+    - For configuration with a client like Cursor and details on running the server, see [Configuring and Running the MCP Server](#configuring-and-running-the-mcp-server) below and the [Developer Guide](./docs/developer_guide.md#running-the-mcp-server).
 
-### Installing the MCP Server for Client Integration
+## Configuring and Running the MCP Server
 
-To integrate the Log Analyzer MCP server with a client application (like Cursor), you'll typically configure the client to launch the `log-analyzer-mcp` package, which is available on PyPI.
+### Configuration
 
-**Example Client Configuration (e.g., in `.cursor/mcp.json`):**
+Configuration of the Log Analyzer MCP (for both CLI and Server) is primarily handled via environment variables or a `.env` file in your project root.
+
+- **Environment Variables:** Set variables like `LOG_DIRECTORIES`, `LOG_PATTERNS_ERROR`, `LOG_CONTEXT_LINES_BEFORE`, `LOG_CONTEXT_LINES_AFTER`, etc., in the environment where the tool or server runs.
+- **`.env` File:** Create a `.env` file by copying `.env.template` (this template file needs to be created and added to the repository) and customize the values.
+
+For a comprehensive list of all configuration options and their usage, please refer to the **(Upcoming) [Configuration Guide](./docs/configuration.md)**.
+*(Note: The `.env.template` file should be created and added to the repository to provide a starting point for users.)*
+
+### Running the MCP Server
+
+The MCP server can be launched in several ways:
+
+1. **Via an MCP Client (e.g., Cursor):**
+    Configure your client to launch the `log-analyzer-mcp` executable (often using a helper like `uvx`). This is the typical way to integrate the server.
+
+    **Example Client Configuration (e.g., in `.cursor/mcp.json`):**
 
 ```jsonc
 {
@@ -60,9 +117,10 @@ To integrate the Log Analyzer MCP server with a client application (like Cursor)
         "MCP_LOG_LEVEL": "INFO", // Recommended for production
         // "MCP_LOG_FILE": "/path/to/your/logs/mcp/log_analyzer_mcp_server.log", // Optional
         // --- Configure Log Analyzer specific settings via environment variables ---
+        // These are passed to the analysis engine used by the server.
         // Example: "LOG_DIRECTORIES": "[\"/path/to/your/app/logs\"]",
         // Example: "LOG_PATTERNS_ERROR": "[\"Exception:.*\"]"
-        // (Refer to docs/configuration.md (once created) for all options)
+        // (Refer to the (Upcoming) docs/configuration.md for all options)
       }
     }
     // You can add other MCP servers here
@@ -72,17 +130,33 @@ To integrate the Log Analyzer MCP server with a client application (like Cursor)
 
 **Notes:**
 
-- Replace placeholder paths and consult the [Getting Started Guide](./docs/getting_started.md) and [Developer Guide](./docs/developer_guide.md) for more on configuration options and environment variables.
+- Replace placeholder paths and consult the [Getting Started Guide](./docs/getting_started.md), the **(Upcoming) [Configuration Guide](./docs/configuration.md)**, and the [Developer Guide](./docs/developer_guide.md) for more on configuration options and environment variables.
 - The actual package name on PyPI is `log-analyzer-mcp`.
+
+2. **Directly (for development/testing):**
+    You can run the server directly using its entry point if needed. The `log-analyzer-mcp` command (available after installation) can be used:
+
+    ```bash
+    log-analyzer-mcp --transport http --port 8080
+    # or for stdio transport
+    # log-analyzer-mcp --transport stdio
+    ```
+
+    Refer to `log-analyzer-mcp --help` for more options. For development, using Hatch scripts defined in `pyproject.toml` or the methods described in the [Developer Guide](./docs/developer_guide.md#running-the-mcp-server) is also common.
 
 ## Documentation
 
 - **[API Reference](./docs/api_reference.md):** Detailed reference for MCP server tools and CLI commands.
-- **[Getting Started Guide](./docs/getting_started.md):** For users and integrators.
-- **[Developer Guide](./docs/developer_guide.md):** For contributors and those building from source.
+- **[Getting Started Guide](./docs/getting_started.md):** For users and integrators. This guide provides a general overview.
+- **[Developer Guide](./docs/developer_guide.md):** For contributors, covering environment setup, building, detailed testing procedures (including coverage checks), and release guidelines.
+- **(Upcoming) [Configuration Guide](./docs/configuration.md):** Detailed explanation of all `.env` and environment variable settings. *(This document needs to be created.)*
+- **(Upcoming) [CLI Usage Guide](./docs/cli_usage_guide.md):** Comprehensive guide to all `loganalyzer` commands and options. *(This document needs to be created.)*
+- **[.env.template](.env.template):** A template file for configuring environment variables. *(This file needs to be created and added to the repository.)*
 - **[Refactoring Plan](./docs/refactoring/log_analyzer_refactoring_v2.md):** Technical details on the ongoing evolution of the project.
-- **(Upcoming) Configuration Guide:** Detailed explanation of all `.env` and environment variable settings.
-- **(Upcoming) CLI Usage Guide:** Comprehensive guide to all `loganalyzer` commands and options.
+
+## Testing
+
+To run tests and generate coverage reports, please refer to the comprehensive [Testing Guidelines in the Developer Guide](./docs/developer_guide.md#testing-guidelines). This section covers using `hatch test`, running tests with coverage, generating HTML reports, and targeting specific tests.
 
 ## Contributing
 

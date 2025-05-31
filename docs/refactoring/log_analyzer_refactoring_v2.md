@@ -80,19 +80,19 @@ This phase is considered complete as per `log_analyzer_refactoring_v1.md`. All i
 
 ## Phase 4: Testing and Coverage
 
-- [ ] **Update/Create Tests:**
+- [x] **Update/Create Tests:**
   - [x] **In `tests/log_analyzer_mcp/`:**
     - [x] Write comprehensive tests for the core analysis engine (`src/log_analyzer_mcp/core/analysis_engine.py`).
     - [x] Write tests for the new `.env` configuration loading and environment variable overrides (if handled by a shared module in `src/log_analyzer_mcp/common`). (Covered by `AnalysisEngine` tests with `ConfigLoader`)
-    - [x] Write tests for the new/updated MCP server tools in `log_analyzer_mcp_server.py`. (Tests written; core functionality confirmed via direct MCP calls, but automated tests like `test_quick_subset` remain `xfail` due to `server_session` fixture issues)
+    - [x] Write tests for the new/updated MCP server tools in `log_analyzer_mcp_server.py`. (Tests written; core functionality confirmed via direct MCP calls. `test_main_function_stdio_mode` successfully covers stdio startup via `main()`. `test_main_function_http_mode` is XFAIL. Other automated tests like `test_quick_subset` using the `server_session` fixture remain `xfail` due to fixture issues, though they currently `XPASS`.)
     - [x] **Remove tests related to `parse_coverage.py`.** (Done)
     - [x] **Adapt or remove tests for `analyze_runtime_errors.py` once the module is removed.** (Adapted, `test_analyze_runtime_errors.py` calls direct function)
     - [x] Update tests for `log_analyzer.py` if it's retained in any form, or remove them if its functionality is fully migrated. (Superseded by `test_log_parser.py` and `AnalysisEngine` tests)
-  - [ ] **In `tests/log_analyzer_client/`:**
-    - [ ] Write tests for the CLI functionality in `src/log_analyzer_client/cli.py`, mocking or using the core analysis engine.
+  - [x] **In `tests/log_analyzer_client/`:**
+    - [x] Write tests for the CLI functionality in `src/log_analyzer_client/cli.py`. (All 21 tests PASSING, achieving 100% coverage for `cli.py`)
 - [ ] **Achieve and Maintain Test Coverage:**
-  - [ ] Ensure overall project test coverage is >= 80%, covering both `log_analyzer_mcp` and `log_analyzer_client` modules. (Currently lower, needs improvement)
-  - [ ] Specifically target >= 80% coverage for the core analysis engine and the new MCP/CLI interfaces. (`AnalysisEngine` coverage is good, MCP/CLI needs more)
+  - [ ] Ensure overall project test coverage is >= 80%, covering both `log_analyzer_mcp` and `log_analyzer_client` modules. (Currently ~78% for `log_analyzer_mcp` and 100% for `log_analyzer_client`. `src/log_analyzer_client/cli.py` has 100% coverage. Key areas for improvement: `log_analyzer_mcp_server.py` (especially HTTP path if XFAIL resolved, and untested tools), and potentially `src/log_analyzer_mcp/test_log_parser.py`.)
+  - [ ] Specifically target >= 80% coverage for the core analysis engine and the new MCP/CLI interfaces. (`AnalysisEngine` coverage is good; `src/log_analyzer_client/cli.py` is 100%. MCP server `main()` for HTTP mode (XFAIL) and other server tools need more test coverage.)
 
 ## Phase 5: Documentation and Finalization
 
@@ -101,6 +101,7 @@ This phase is considered complete as per `log_analyzer_refactoring_v1.md`. All i
     - [ ] Installation instructions (using `hatch`), noting that it installs both MCP server components and the CLI client.
     - [ ] Detailed usage instructions for the MCP server tools.
     - [ ] Detailed usage instructions for the CLI (`log-analyzer`), including all commands and options.
+    - [ ] Instructions on how to run the MCP server itself via its script entry point (e.g., `uvx log-analyzer-mcp` or `log-analyzer-mcp`), including the `--transport` option (`http` or `stdio`) and HTTP-specific options like `--host`, `--port`, and `--log-level`.
     - [ ] Clear explanation of how to configure logging scopes, directories, patterns, and context lines using `.env` files and environment variables (relevant for both MCP server and CLI).
     - [ ] Examples for `.env` configuration.
     - [ ] How to run tests (covering both `tests/log_analyzer_mcp` and `tests/log_analyzer_client`) and check coverage.
@@ -108,7 +109,7 @@ This phase is considered complete as per `log_analyzer_refactoring_v1.md`. All i
   - [x] Create or update other documents in `docs/` as needed (e.g., `docs/usage.md`, `docs/configuration.md`, `docs/architecture.md` briefly explaining the client/server structure).
 - [x] **Linting and Formatting (Project-wide):**
   - [x] Run `black .` and `isort .` across `src/log_analyzer_mcp`, `src/log_analyzer_client`, `tests/log_analyzer_mcp`, `tests/log_analyzer_client`. (Done)
-  - [ ] Run `pylint src tests` and address warnings/errors. (Skipped for now)
+  - [ ] Run `pylint src tests` and address warnings/errors.
   - [ ] Run `mypy src tests` and address type errors, paying close attention to the new type hinting guidelines.
 - [x] **Build and Distribution:**
   - [x] Verify `pyproject.toml` correctly defines `[project.scripts]` for the `log-analyzer` CLI. (Verified during CLI implementation)

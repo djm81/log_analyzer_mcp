@@ -19,78 +19,53 @@ Key use cases include:
 ## Prerequisites
 
 - **Python**: Version 3.9 or higher.
-- **Hatch**: For package management and running development tasks if you are contributing or building from source. Installation instructions can be found on the [official Hatch website](https://hatch.pypa.io/latest/install/).
+- **Hatch**: For package management and running development tasks if you are contributing or building from source. Installation instructions for Hatch can be found on the [official Hatch website](https://hatch.pypa.io/latest/install/).
+
+For instructions on how to install the **Log Analyzer MCP** package itself, please refer to the [Installation section in the main README.md](../README.md#installation).
 
 ## Using the `log-analyzer` CLI
 
-If you have cloned the repository and set up the development environment (see [Developer Guide](./developer_guide.md)), the `log-analyzer` CLI is available within the Hatch shell.
+Once Log Analyzer MCP is installed, the `log-analyzer` command-line tool will be available in your environment (or within the Hatch shell if you installed a local build into it).
+
+**Basic Invocation:**
 
 ```bash
-# Activate the Hatch environment (if not already active)
-cd path/to/log_analyzer_mcp # Navigate to the project root
-hatch shell
-
-# Now you can use the CLI
 log-analyzer --help
+```
 
-# Example: Search all records in a specific log directory
-# (Configuration for log directories, patterns, etc., is typically done via a .env file or environment variables)
+**Example Usage (conceptual):**
+
+```bash
+# Example: Search all records, assuming configuration is in .env or environment variables
 log-analyzer search all --scope my_app_logs
 ```
 
-For detailed CLI commands and options, refer to:
+**Configuration:**
+The CLI tool uses the same configuration mechanism as the MCP server (environment variables or a `.env` file). Please see the [Configuration section in the main README.md](../README.md#configuration) for more details, and refer to the upcoming `docs/configuration.md` for a full list of options.
+*(Note: An `.env.template` file should be created and added to the repository to provide a starting point for users.)*
 
-- `log-analyzer --help`
-- The upcoming CLI Usage Guide (link to be added once created).
-- The [Refactoring Plan](./refactoring/log_analyzer_refactoring_v2.md) for tool parameters which mirror CLI arguments.
+For detailed CLI commands, options, and more examples, refer to:
+
+- `log-analyzer --help` (for a quick reference)
+- The **(Upcoming) [CLI Usage Guide](./cli_usage_guide.md)** for comprehensive documentation.
+- The [API Reference for CLI commands](./api_reference.md#cli-client-log-analyzer) for a technical breakdown.
 
 ## Integrating the MCP Server
 
-To use the Log Analyzer MCP server with an MCP client application like Cursor, you need to configure the client to launch the server.
+After installing Log Analyzer MCP (see [Installation section in the main README.md](../README.md#installation)), the MCP server component is ready for integration with compatible clients like Cursor.
 
-The recommended way to run the MCP server in a production-like or stable integration is by using the version installed from PyPI.
+Refer to the main [README.md section on Configuring and Running the MCP Server](../README.md#configuring-and-running-the-mcp-server) for details on:
 
-### Example MCP Client Configuration (e.g., `.cursor/mcp.json`)
+- How to configure the server (environment variables, `.env` file).
+- Example client configurations (e.g., for Cursor using `uvx`).
+- How to run the server directly.
 
-This snippet shows how you might configure Cursor (or a similar client) to use the `log-analyzer-mcp` package installed from PyPI. The `uvx` command is a utility to run Python executables from dynamically created virtual environments.
-
-```jsonc
-{
-  "mcpServers": {
-    "log_analyzer_mcp_server_prod": {
-      "command": "uvx",
-      "args": [
-        "log-analyzer-mcp" // This invokes the entry point defined in pyproject.toml
-                         // Ensure the package name matches what's on PyPI.
-                         // Use "log-analyzer-mcp==<version>" for a specific version.
-      ],
-      "env": {
-        "PYTHONUNBUFFERED": "1",
-        "PYTHONIOENCODING": "utf-8",
-        "MCP_LOG_LEVEL": "INFO", // Recommended for production
-        // MCP_LOG_FILE is optional; if not set, logs might go to stderr/stdout or a default location.
-        // "MCP_LOG_FILE": "/path/to/your/project/logs/mcp/log_analyzer_mcp_server.log",
-        // --- Other Environment Variables for Configuration ---
-        // The Log Analyzer MCP can be configured via environment variables.
-        // Refer to the main README or upcoming Configuration Guide for details.
-        // Examples (these would be set in your client's environment or this env block):
-        // "LOG_DIRECTORIES": "[\"/path/to/your/app/logs\", \"/another/log/path\"]",
-        // "LOG_PATTERNS_ERROR": "[\"Exception:.*\", \"Traceback (most recent call last):\"]"
-      }
-    }
-    // ... other MCP server configurations ...
-  }
-}
-```
-
-**Key considerations for integration:**
-
-1. **Package Name:** Ensure the package name in the `args` (e.g., `log-analyzer-mcp`) matches the name on PyPI.
-2. **Versioning:** You can specify a version (e.g., `log-analyzer-mcp==0.2.0`) to ensure stability.
-3. **Environment Variables:** The Log Analyzer MCP uses environment variables for configuration (e.g., log directories, filter patterns, context lines). These must be set in the environment where the MCP server process is launched. Consult the main `README.md` or the forthcoming Configuration Guide for details on available environment variables.
-4. **Logging:** `MCP_LOG_LEVEL` and `MCP_LOG_FILE` control the MCP server's own logging.
+Key aspects like the server's own logging (`MCP_LOG_LEVEL`, `MCP_LOG_FILE`) and the analysis engine configuration (`LOG_DIRECTORIES`, `LOG_PATTERNS_*`, etc.) are covered there and in the upcoming `docs/configuration.md`.
 
 ## Next Steps
 
-- For developing or contributing to Log Analyzer MCP, see the [Developer Guide](./developer_guide.md).
-- For more details on the available tools and their parameters, consult the [Refactoring Plan](./refactoring/log_analyzer_refactoring_v2.md) (which outlines the tool specifications) or the upcoming dedicated Usage Guide.
+- **Explore the CLI:** Try `log-analyzer --help` and experiment with some search commands based on the [API Reference for CLI commands](./api_reference.md#cli-client-log-analyzer).
+- **Configure for Your Logs:** Set up your `.env` file (once `.env.template` is available) or environment variables to point to your log directories and define any custom patterns.
+- **Integrate with MCP Client:** If you use an MCP client like Cursor, configure it to use the `log-analyzer-mcp` server.
+- **For Developing or Contributing:** See the [Developer Guide](./developer_guide.md).
+- **For Detailed Tool/Command Reference:** Consult the [API Reference](./api_reference.md).
