@@ -32,7 +32,7 @@ This package can be installed from PyPI (once published) or directly from a loca
 
 ### From PyPI (Recommended for Users)
 
-*(Once the package is published to PyPI)*
+*Once the package is published to PyPI.*
 
 ```bash
 pip install log-analyzer-mcp
@@ -102,36 +102,36 @@ The MCP server can be launched in several ways:
 
     **Example Client Configuration (e.g., in `.cursor/mcp.json`):**
 
-```jsonc
-{
-  "mcpServers": {
-    "log_analyzer_mcp_server_prod": {
-      "command": "uvx", // uvx is a tool to run python executables from venvs
-      "args": [
-        "log-analyzer-mcp" // Fetches and runs the latest version from PyPI
-        // Or, for a specific version: "log-analyzer-mcp==0.2.0"
-      ],
-      "env": {
-        "PYTHONUNBUFFERED": "1",
-        "PYTHONIOENCODING": "utf-8",
-        "MCP_LOG_LEVEL": "INFO", // Recommended for production
-        // "MCP_LOG_FILE": "/path/to/your/logs/mcp/log_analyzer_mcp_server.log", // Optional
-        // --- Configure Log Analyzer specific settings via environment variables ---
-        // These are passed to the analysis engine used by the server.
-        // Example: "LOG_DIRECTORIES": "[\"/path/to/your/app/logs\"]",
-        // Example: "LOG_PATTERNS_ERROR": "[\"Exception:.*\"]"
-        // (Refer to the (Upcoming) docs/configuration.md for all options)
+    ```jsonc
+    {
+      "mcpServers": {
+        "log_analyzer_mcp_server_prod": {
+          "command": "uvx", // uvx is a tool to run python executables from venvs
+          "args": [
+            "log-analyzer-mcp" // Fetches and runs the latest version from PyPI
+            // Or, for a specific version: "log-analyzer-mcp==0.2.0"
+          ],
+          "env": {
+            "PYTHONUNBUFFERED": "1",
+            "PYTHONIOENCODING": "utf-8",
+            "MCP_LOG_LEVEL": "INFO", // Recommended for production
+            // "MCP_LOG_FILE": "/path/to/your/logs/mcp/log_analyzer_mcp_server.log", // Optional
+            // --- Configure Log Analyzer specific settings via environment variables ---
+            // These are passed to the analysis engine used by the server.
+            // Example: "LOG_DIRECTORIES": "[\"/path/to/your/app/logs\"]",
+            // Example: "LOG_PATTERNS_ERROR": "[\"Exception:.*\"]"
+            // (Refer to the (Upcoming) docs/configuration.md for all options)
+          }
+        }
+        // You can add other MCP servers here
       }
     }
-    // You can add other MCP servers here
-  }
-}
-```
+    ```
 
-**Notes:**
+    **Notes:**
 
-- Replace placeholder paths and consult the [Getting Started Guide](./docs/getting_started.md), the **(Upcoming) [Configuration Guide](./docs/configuration.md)**, and the [Developer Guide](./docs/developer_guide.md) for more on configuration options and environment variables.
-- The actual package name on PyPI is `log-analyzer-mcp`.
+    - Replace placeholder paths and consult the [Getting Started Guide](./docs/getting_started.md), the **(Upcoming) [Configuration Guide](./docs/configuration.md)**, and the [Developer Guide](./docs/developer_guide.md) for more on configuration options and environment variables.
+    - The actual package name on PyPI is `log-analyzer-mcp`.
 
 2. **Directly (for development/testing):**
     You can run the server directly using its entry point if needed. The `log-analyzer-mcp` command (available after installation) can be used:
