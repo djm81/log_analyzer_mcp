@@ -107,10 +107,10 @@ Maybe a crash before summary.
 
 
 class TestExtractFailedTests:
-    def test_no_failures(self):
+    def test_no_failures(self) -> None:
         assert extract_failed_tests(LOG_NO_FAILURES) == []
 
-    def test_module_failures(self):
+    def test_module_failures(self) -> None:
         expected = [
             {"module": "test_module_beta", "test_file": "tests/test_module_beta.py"},
             {"module": "test_module_gamma", "test_file": "tests/test_module_gamma.py"},
@@ -140,7 +140,7 @@ class TestExtractFailedTests:
 
 
 class TestExtractOverallSummary:
-    def test_no_failures_summary(self):
+    def test_no_failures_summary(self) -> None:
         summary = extract_overall_summary(LOG_NO_FAILURES)
         assert summary["passed"] == 10
         assert summary["failed"] == 0
@@ -233,7 +233,7 @@ class TestExtractOverallSummary:
 
 
 class TestAnalyzePytestLogContent:
-    def test_analyze_summary_only(self):
+    def test_analyze_summary_only(self) -> None:
         result = analyze_pytest_log_content(LOG_WITH_MODULE_FAILURES, summary_only=True)
         assert "overall_summary" in result
         assert "failed_tests" not in result
@@ -255,13 +255,13 @@ class TestAnalyzePytestLogContent:
         ]
         assert result["failed_tests"] == expected_failed_tests
 
-    def test_analyze_no_failures(self):
+    def test_analyze_no_failures(self) -> None:
         result = analyze_pytest_log_content(LOG_NO_FAILURES, summary_only=False)
         assert result["overall_summary"]["status"] == "PASSED"
         assert result["overall_summary"]["passed"] == 10
         assert result["failed_tests"] == []
 
-    def test_analyze_with_errors(self):
+    def test_analyze_with_errors(self) -> None:
         result = analyze_pytest_log_content(LOG_WITH_ERRORS, summary_only=False)
         assert result["overall_summary"]["status"] == "FAILED"
         assert result["overall_summary"]["errors"] == 1

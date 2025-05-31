@@ -2,6 +2,7 @@
 import json
 import logging
 import sys
+from typing import Callable, Optional
 
 import click
 
@@ -18,7 +19,7 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 # Create a simple logger for the CLI
 # This logger will output to stdout by default.
 # More sophisticated logging (e.g., to a file, configurable levels) can be added later if needed.
-def get_cli_logger():
+def get_cli_logger() -> logging.Logger:
     logger = logging.getLogger("LogAnalyzerCLI")
     if not logger.handlers:  # Avoid adding multiple handlers if re-invoked (e.g. in tests)
         handler = logging.StreamHandler(sys.stdout)
@@ -36,7 +37,7 @@ def get_cli_logger():
     "--env-file", type=click.Path(exists=True, dir_okay=False), help="Path to a custom .env file for configuration."
 )
 @click.pass_context
-def cli(ctx, env_file):
+def cli(ctx: click.Context, env_file: Optional[str]) -> None:
     """Log Analyzer CLI - A tool to search and filter log files."""
     ctx.ensure_object(dict)
     cli_logger = get_cli_logger()  # Get logger instance
@@ -47,13 +48,13 @@ def cli(ctx, env_file):
 
 
 @cli.group("search")
-def search():
+def search() -> None:
     """Search log files with different criteria."""
-    ...
+    pass
 
 
 # Common options for search commands
-def common_search_options(func):
+def common_search_options(func: Callable) -> Callable:
     func = click.option(
         "--scope", default="default", show_default=True, help="Logging scope to search within (from .env or default)."
     )(func)
@@ -94,13 +95,13 @@ def common_search_options(func):
 @common_search_options
 @click.pass_context
 def search_all(
-    ctx,
+    ctx: click.Context,
     scope: str,
     context_before: int,
     context_after: int,
-    log_dirs_override: str | None,
-    log_content_patterns_override: str | None,
-):
+    log_dirs_override: Optional[str],
+    log_content_patterns_override: Optional[str],
+) -> None:
     """Search for all log records matching configured patterns."""
     engine: AnalysisEngine = ctx.obj["analysis_engine"]
     click.echo(f"Searching all records in scope: {scope}, context: {context_before}B/{context_after}A")
@@ -129,16 +130,16 @@ def search_all(
 @common_search_options
 @click.pass_context
 def search_time(
-    ctx,
+    ctx: click.Context,
     minutes: int,
     hours: int,
     days: int,
     scope: str,
     context_before: int,
     context_after: int,
-    log_dirs_override: str | None,
-    log_content_patterns_override: str | None,
-):
+    log_dirs_override: Optional[str],
+    log_content_patterns_override: Optional[str],
+) -> None:
     """Search logs within a specified time window."""
     engine: AnalysisEngine = ctx.obj["analysis_engine"]
 
@@ -178,14 +179,14 @@ def search_time(
 @common_search_options
 @click.pass_context
 def search_first(
-    ctx,
+    ctx: click.Context,
     count: int,
     scope: str,
     context_before: int,
     context_after: int,
-    log_dirs_override: str | None,
-    log_content_patterns_override: str | None,
-):
+    log_dirs_override: Optional[str],
+    log_content_patterns_override: Optional[str],
+) -> None:
     """Search for the first N (oldest) matching log records."""
     engine: AnalysisEngine = ctx.obj["analysis_engine"]
     if count <= 0:
@@ -217,14 +218,14 @@ def search_first(
 @common_search_options
 @click.pass_context
 def search_last(
-    ctx,
+    ctx: click.Context,
     count: int,
     scope: str,
     context_before: int,
     context_after: int,
-    log_dirs_override: str | None,
-    log_content_patterns_override: str | None,
-):
+    log_dirs_override: Optional[str],
+    log_content_patterns_override: Optional[str],
+) -> None:
     """Search for the last N (newest) matching log records."""
     engine: AnalysisEngine = ctx.obj["analysis_engine"]
     if count <= 0:

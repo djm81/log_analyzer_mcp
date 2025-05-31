@@ -11,9 +11,9 @@ import os
 import re
 import subprocess
 import sys
-import traceback
+import functools
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from mcp.server.fastmcp import FastMCP
 
@@ -122,7 +122,7 @@ from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
-async def server_lifespan(server: FastMCP) -> AsyncIterator[None]:  # Simple lifespan, no app context needed
+async def server_lifespan(_server: FastMCP) -> AsyncIterator[None]:  # Simple lifespan, no app context needed
     logger.info("MCP Server Lifespan: Startup phase entered.")
     try:
         yield
@@ -181,11 +181,6 @@ async def analyze_tests(summary_only: bool = False) -> dict[str, Any]:
         summary_only: Whether to return only a summary of the test results
     """
     logger.info("Analyzing test results (summary_only=%s)...", summary_only)
-
-    if not isinstance(summary_only, bool):
-        error_msg = f"Invalid summary_only value: {summary_only}. Must be a boolean."
-        logger.error(error_msg)
-        return {"error": error_msg, "summary": {"status": "ERROR", "passed": 0, "failed": 0, "skipped": 0}}
 
     log_file = test_log_file
 
@@ -316,116 +311,69 @@ async def _run_tests(
     logger.debug("Expected test output log path for analysis: %s", test_log_output_path)
 
     try:
-        # Correctly reference PROJECT_ROOT from the logger_setup module
-        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # ADDED import for clarity
+        # Run the command using anyio.to_thread to avoid blocking asyncio event loop
+        # Ensure text=True for automatic decoding of stdout/stderr to string
+        process = await anyio.to_thread.run_sync(  # type: ignore[attr-defined]
+            functools.partial(
+                subprocess.run,
+                hatch_cmd,
+                capture_output=True,
+                text=True,  # Decode stdout/stderr as text (usually UTF-8)
+                check=False,  # Don't raise exception for non-zero exit, handle manually
+                timeout=120,  # Add timeout
+            )
+        )
+        stdout_output: str = process.stdout
+        stderr_output: str = process.stderr
+        rc = process.returncode
 
-        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
-
-        logger.info("Executing hatch command: %s with cwd=%s", " ".join(hatch_cmd), current_project_root)  # MODIFIED
-        with subprocess.Popen(
-            hatch_cmd,
-            cwd=current_project_root,  # MODIFIED
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,  # Line-buffered
-            universal_newlines=True,  # Ensure text mode works consistently
-        ) as process:
-            logger.info("Subprocess for hatch test started with PID: %s", process.pid)
-
-            stdout_full = ""
-            stderr_full = ""
-            try:
-                logger.info("Waiting for hatch test subprocess (PID: %s) to complete...", process.pid)
-                stdout_full, stderr_full = process.communicate(timeout=170)  # Slightly less than main timeout
-                logger.info(
-                    "Subprocess (PID: %s) stdout captured (first 500 chars):\n%s", process.pid, stdout_full[:500]
-                )
-                logger.info(
-                    "Subprocess (PID: %s) stderr captured (first 500 chars):\n%s", process.pid, stderr_full[:500]
-                )
-            except subprocess.TimeoutExpired:
-                logger.error("Subprocess (PID: %s) timed out during communicate(). Killing process.", process.pid)
-                process.kill()
-                # Attempt to get remaining output after kill
-                stdout_full, stderr_full = process.communicate()
-                logger.error(
-                    "Subprocess (PID: %s) stdout after kill (first 500 chars):\n%s", process.pid, stdout_full[:500]
-                )
-                logger.error(
-                    "Subprocess (PID: %s) stderr after kill (first 500 chars):\n%s", process.pid, stderr_full[:500]
-                )
-                return {
-                    "success": False,
-                    "error": "Test execution (hatch test) timed out internally.",
-                    "test_output": stdout_full + "\n" + stderr_full,
-                    "analysis_log_path": None,
-                }
-            except (OSError, ValueError) as e:  # More specific errors for communicate()
-                logger.error("Error during process.communicate() for PID %s: %s", process.pid, e, exc_info=True)
-                # process.kill() # Consider if kill is needed for other OSErrors
-                # stdout_full, stderr_full = process.communicate() # May also fail
-                return {
-                    "success": False,
-                    "error": f"OS/Value error during test execution: {e}",
-                    "test_output": stdout_full + "\n" + stderr_full,  # May be incomplete
-                    "analysis_log_path": None,
-                }
-
-            return_code = process.returncode
-            logger.info("Hatch test subprocess (PID: %s) completed with return code: %s", process.pid, return_code)
-
-            # Pytest exit codes:
-            # 0: All tests passed
-            # 1: Tests were collected and run but some tests failed
-            # 2: Test execution was interrupted by the user
-            # 3: Internal error occurred during test execution
-            # 4: pytest command line usage error
-            # 5: No tests were collected
-            # We consider 0, 1, and 5 as "successful" execution of pytest itself.
-            if return_code not in [0, 1, 5]:
-                logger.error("Hatch test command failed with unexpected pytest return code: %s", return_code)
-                logger.error("STDOUT:\n%s", stdout_full)
-                logger.error("STDERR:\n%s", stderr_full)
-                return {
-                    "success": False,
-                    "error": f"Test execution failed with code {return_code}",
-                    "test_output": stdout_full + "\n" + stderr_full,
-                    "analysis_log_path": None,
-                }
-
-            logger.debug("Saving combined stdout/stderr from hatch test to %s", test_log_output_path)
-            with open(test_log_output_path, "w", encoding="utf-8") as f:
-                f.write(stdout_full)
-                f.write("\n")
-                f.write(stderr_full)
-            logger.debug("Content saved to %s", test_log_output_path)
-
-            # _run_tests now only runs tests and saves the log.
-            # Analysis is done by the analyze_tests tool or by the caller if needed.
-
-            # The old log_analyzer.main() call is removed.
-            # If an agent was specified, the caller of _run_tests might want to know.
-            # We can still populate this in the result.
-            if agent:
-                # analysis_to_return is None, so we can create a small dict or add to a base dict
-                # For now, let's just focus on returning the essential info
-                pass
-
+        if rc not in [0, 1, 5]:
+            logger.error("Hatch test command failed with unexpected pytest return code: %s", rc)
+            logger.error("STDOUT:\n%s", stdout_output)
+            logger.error("STDERR:\n%s", stderr_output)
             return {
-                "success": True,
-                "return_code": return_code,
-                "test_output": stdout_full + "\n" + stderr_full,
-                "analysis_log_path": test_log_output_path,  # Provide path to the log for analysis
-                # "analysis" field is removed from here as _run_tests no longer parses.
+                "success": False,
+                "error": f"Test execution failed with code {rc}",
+                "test_output": stdout_output + "\n" + stderr_output,
+                "analysis_log_path": None,
             }
 
-    except FileNotFoundError:
-        logger.error("Error: Hatch command not found. Ensure hatch is installed and in PATH.", exc_info=True)
+        logger.debug("Saving combined stdout/stderr from hatch test to %s", test_log_output_path)
+        with open(test_log_output_path, "w", encoding="utf-8") as f:
+            f.write(stdout_output)
+            f.write("\n")
+            f.write(stderr_output)
+        logger.debug("Content saved to %s", test_log_output_path)
+
+        # _run_tests now only runs tests and saves the log.
+        # Analysis is done by the analyze_tests tool or by the caller if needed.
+
+        # The old log_analyzer.main() call is removed.
+        # If an agent was specified, the caller of _run_tests might want to know.
+        # We can still populate this in the result.
+        if agent:
+            # analysis_to_return is None, so we can create a small dict or add to a base dict
+            # For now, let's just focus on returning the essential info
+            pass
+
+        return {
+            "success": True,
+            "return_code": rc,
+            "test_output": stdout_output + "\n" + stderr_output,
+            "analysis_log_path": test_log_output_path,  # Provide path to the log for analysis
+            # "analysis" field is removed from here as _run_tests no longer parses.
+        }
+
+    except subprocess.TimeoutExpired as e:
+        stdout_output = e.stdout.decode("utf-8", errors="replace") if e.stdout else ""
+        stderr_output = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
+        stderr_output += f"\nError: Test execution timed out after 170 seconds."
+        rc = 1  # Indicate failure
+        logger.error("Test execution in _run_tests timed out: %s", e)
         return {
             "success": False,
-            "error": "Hatch command not found.",
-            "test_output": "",
+            "error": stderr_output,
+            "test_output": stdout_output + "\n" + stderr_output,
             "analysis_log_path": None,
         }
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -433,9 +381,9 @@ async def _run_tests(
         # Capture output if process started
         final_stdout = ""
         final_stderr = ""
-        if "stdout_full" in locals() and "stderr_full" in locals():  # Check if communicate() was reached
-            final_stdout = stdout_full
-            final_stderr = stderr_full
+        if "stdout_output" in locals() and "stderr_output" in locals():  # Check if communicate() was reached
+            final_stdout = stdout_output
+            final_stderr = stderr_output
         # else: process might not have been initialized or communicate not called.
         # No direct access to process.stdout/stderr here as it's out of 'with' scope.
 
@@ -475,176 +423,95 @@ async def ping() -> str:
 
 async def run_coverage_script(force_rebuild: bool = False) -> dict[str, Any]:
     """
-    Run tests with coverage, generate XML and HTML reports using hatch, and capture text summary.
-
-    Args:
-        force_rebuild: This parameter is respected by always running the generation commands.
-
-    Returns:
-        Dictionary containing execution results and report paths.
+    Run the coverage report script and generate HTML and XML reports.
+    Now uses hatch scripts for better integration.
     """
-    import anyio
+    logger.info("Running coverage script...")
+    # Correctly reference PROJECT_ROOT from the logger_setup module
+    from log_analyzer_mcp.common import logger_setup as common_logger_setup  # Ensure this import is here or global
 
-    logger.info("Running coverage generation using hatch (force_rebuild=%s)...", force_rebuild)
+    current_project_root = common_logger_setup.PROJECT_ROOT
+    # Define different timeouts for different steps
+    timeout_run_cov = 300  # Longer timeout for running tests with coverage
+    timeout_cov_report = 120  # Shorter timeout for generating the report
 
-    coverage_xml_report_path = os.path.join(
-        logs_base_dir, "tests", "coverage", "coverage.xml"
-    )  # RESTORED logs_base_dir
-    coverage_html_report_dir = os.path.join(logs_base_dir, "tests", "coverage", "html")  # RESTORED logs_base_dir
-    coverage_html_index_path = os.path.join(coverage_html_report_dir, "index.html")
+    # Command parts for running the coverage script via hatch
+    # This assumes 'run-cov' and 'cov-report' are defined in hatch envs.
+    # Step 1: Run tests with coverage enabled
+    cmd_parts_run_cov = ["hatch", "run", "hatch-test.py3.12:run-cov"]  # Example: Target specific py version
+    # Step 2: Generate combined report (HTML and XML)
+    cmd_parts_report = ["hatch", "run", "hatch-test.py3.12:cov-report"]  # Example
 
-    # Step 1: Run tests with coverage enabled using our _run_tests helper
-    # This ensures .coverage data file is up-to-date.
-    # Verbosity for this internal test run can be minimal unless errors occur.
-    logger.info("Step 1: Running 'hatch test --cover' via _run_tests...")
-    test_run_results = await _run_tests(verbosity="0", run_with_coverage=True)
+    outputs = []
+    errors_encountered = []
 
-    if test_run_results["return_code"] != 0:
-        logger.error(
-            "Test run with coverage failed. Aborting coverage report generation. Output:\n%s",
-            test_run_results["test_output"],
+    steps_with_timeouts = [
+        ("run-cov", cmd_parts_run_cov, timeout_run_cov),
+        ("cov-report", cmd_parts_report, timeout_cov_report),
+    ]
+
+    for step_name, cmd_parts, current_timeout_seconds in steps_with_timeouts:
+        logger.info(
+            "Executing coverage step '%s': %s (timeout: %ss)", step_name, " ".join(cmd_parts), current_timeout_seconds
         )
-        return {
-            "success": False,
-            "error": "Test run with coverage failed. See test_output.",
-            "test_output": test_run_results["test_output"],
-            "details": test_run_results,
-        }
-    logger.info("Step 1: 'hatch test --cover' completed successfully.")
-
-    # Step 2: Generate XML report using hatch script
-    logger.info("Step 2: Generating XML coverage report with 'hatch run xml'...")
-    hatch_xml_cmd = ["hatch", "run", "xml"]
-    xml_output_text = ""
-    xml_success = False
-    try:
-        # Correctly reference PROJECT_ROOT from the logger_setup module
-        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # Ensure import if not already visible
-
-        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
-
-        # Use anyio.run_process for better async/await and cancellation handling
-        process = await anyio.run_process(
-            hatch_xml_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
-        )  # MODIFIED
-        stdout = process.stdout
-        stderr = process.stderr
-        xml_output_text = stdout + stderr
-        if process.returncode == 0 and os.path.exists(coverage_xml_report_path):
-            logger.info("XML coverage report generated: %s", coverage_xml_report_path)
-            xml_success = True
-        else:
-            logger.error(
-                "'hatch run xml' failed. RC: %s. Output:\\n%s",
-                process.returncode,
-                (process.stdout + process.stderr).decode("utf-8", errors="ignore"),
-            )  # Decode
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Exception during 'hatch run xml': %s", e)
-        xml_output_text = str(e).encode("utf-8")  # Ensure bytes for consistency if error
-
-    # Step 3: Generate HTML report using hatch script
-    logger.info("Step 3: Generating HTML coverage report with 'hatch run run-html'...")
-    hatch_html_cmd = ["hatch", "run", "run-html"]
-    html_output_text = ""
-    html_success = False
-    try:
-        # Correctly reference PROJECT_ROOT from the logger_setup module
-        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # Ensure import if not already visible
-
-        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
-
-        # Use anyio.run_process for better async/await and cancellation handling
-        process = await anyio.run_process(
-            hatch_html_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
-        )  # MODIFIED
-        stdout = process.stdout
-        stderr = process.stderr
-        html_output_text = stdout + stderr
-        if process.returncode == 0 and os.path.exists(coverage_html_index_path):
-            logger.info("HTML coverage report generated in: %s", coverage_html_report_dir)
-            html_success = True
-        else:
-            logger.error(
-                "'hatch run run-html' failed. RC: %s. Output:\\n%s",
-                process.returncode,
-                (process.stdout + process.stderr).decode("utf-8", errors="ignore"),
-            )  # Decode
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Exception during 'hatch run run-html': %s", e)
-        html_output_text = str(e).encode("utf-8")  # Ensure bytes for consistency if error
-
-    # Step 4: Get text summary report using hatch script
-    logger.info("Step 4: Generating text coverage summary with 'hatch run default:cov-text-summary'...")
-    hatch_summary_cmd = ["hatch", "run", "default:cov-text-summary"]
-    summary_output_text = ""
-    summary_success = False
-    try:
-        # Correctly reference PROJECT_ROOT from the logger_setup module
-        from log_analyzer_mcp.common import logger_setup as common_logger_setup  # Ensure import if not already visible
-
-        current_project_root = common_logger_setup.PROJECT_ROOT  # ADDED variable
-
-        # Use anyio.run_process for better async/await and cancellation handling
-        process = await anyio.run_process(
-            hatch_summary_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
-        )  # MODIFIED
-        # stdout = process.stdout # Not needed directly
-        # stderr = process.stderr # Not needed directly
-        # return_code = process.returncode # Not needed directly
-        if process.returncode == 0:
-            summary_output_text_bytes = process.stdout + process.stderr
-            summary_output_text = summary_output_text_bytes.decode("utf-8", errors="ignore")  # Decode once
-            logger.info(
-                "Text coverage summary command executed. Captured output (first 500 chars):\\n%s",
-                summary_output_text[:500],  # Use decoded string
+        try:
+            # Use functools.partial for subprocess.run
+            configured_subprocess_run_step = functools.partial(
+                subprocess.run,
+                cmd_parts,
+                cwd=current_project_root,
+                capture_output=True,
+                text=True,  # Decode stdout/stderr as text
+                check=False,  # Handle non-zero exit manually
+                timeout=current_timeout_seconds,  # Use current step's timeout
             )
-            summary_success = True
-        else:
-            summary_output_text_bytes = process.stdout + process.stderr
-            summary_output_text = summary_output_text_bytes.decode("utf-8", errors="ignore")  # Decode for logging
-            logger.error(
-                "'hatch run default:cov-text-summary' failed. RC: %s. Output:\\n%s",
-                process.returncode,  # Use process.returncode
-                summary_output_text,  # Use decoded string
-            )
-            # summary_output_text = summary_output_text_bytes  # Keep as bytes if needed elsewhere, or ensure consistent type
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Exception during 'hatch run default:cov-text-summary': %s", e)
-        summary_output_text = str(e)  # Ensure string for consistency if error
+            process = await anyio.to_thread.run_sync(configured_subprocess_run_step)  # type: ignore[attr-defined]
+            stdout_output: str = process.stdout
+            stderr_output: str = process.stderr
+            rc = process.returncode
 
-    final_success = xml_success and html_success and summary_success
+            outputs.append(f"--- {step_name} STDOUT ---\n{stdout_output}")
+            if stderr_output:
+                outputs.append(f"--- {step_name} STDERR ---\n{stderr_output}")
+
+            if rc != 0:
+                error_msg = f"Coverage step '{step_name}' failed with return code {rc}."
+                logger.error("%s\nSTDERR:\n%s", error_msg, stderr_output)
+                errors_encountered.append(error_msg)
+                # Optionally break if a step fails, or collect all errors
+                # break
+
+        except subprocess.TimeoutExpired as e:
+            stdout_output = e.stdout.decode("utf-8", errors="replace") if e.stdout else ""
+            stderr_output = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
+            error_msg = f"Coverage step '{step_name}' timed out after {current_timeout_seconds} seconds."
+            logger.error("%s: %s", error_msg, e)
+            errors_encountered.append(error_msg)
+            outputs.append(f"--- {step_name} TIMEOUT STDOUT ---\n{stdout_output}")
+            outputs.append(f"--- {step_name} TIMEOUT STDERR ---\n{stderr_output}")
+            # break
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            error_msg = f"Error during coverage step '{step_name}': {e}"
+            logger.error(error_msg, exc_info=True)
+            errors_encountered.append(error_msg)
+            # break
+
+    # Ensure a dictionary is always returned, even if errors occurred.
+    final_success = not errors_encountered
     overall_message = (
-        "Coverage reports generated successfully." if final_success else "One or more coverage generation steps failed."
+        "Coverage script steps completed." if final_success else "Errors encountered during coverage script execution."
     )
-
-    # Try to parse overall coverage percentage from the text summary for convenience
-    overall_coverage_percent = None
-    if summary_success:
-        # Ensure summary_output_text is a string for re.search
-        # summary_str = summary_output_text.decode('utf-8', errors='ignore') if isinstance(summary_output_text, bytes) else summary_output_text
-        # The variable summary_output_text should be string type by now if summary_success is true.
-        match = re.search(r"TOTAL\\s+\\d+\\s+\\d+\\s+(\\d+)%", summary_output_text)  # Use summary_output_text directly
-        if match:
-            overall_coverage_percent = int(match.group(1))
-            logger.info("Extracted overall coverage: %s%%", overall_coverage_percent)
+    # Placeholder for actual report paths, adapt as needed
+    coverage_xml_report_path = os.path.join(logs_base_dir, "tests", "coverage", "coverage.xml")
+    coverage_html_index_path = os.path.join(logs_base_dir, "tests", "coverage", "html", "index.html")
 
     return {
         "success": final_success,
         "message": overall_message,
-        "overall_coverage_percent": overall_coverage_percent,  # From text report
-        "coverage_xml_path": coverage_xml_report_path if xml_success else None,
-        "coverage_html_dir": coverage_html_report_dir if html_success else None,
-        "coverage_html_index": coverage_html_index_path if html_success else None,
-        "text_summary_output": summary_output_text,
-        "hatch_xml_output": (
-            xml_output_text.decode("utf-8", errors="ignore") if isinstance(xml_output_text, bytes) else xml_output_text
-        ),  # Decode for return
-        "hatch_html_output": (
-            html_output_text.decode("utf-8", errors="ignore")
-            if isinstance(html_output_text, bytes)
-            else html_output_text
-        ),  # Decode for return
+        "details": "\n".join(outputs),
+        "errors": errors_encountered,
+        "coverage_xml_path": coverage_xml_report_path if final_success else None,  # Example path
+        "coverage_html_index": coverage_html_index_path if final_success else None,  # Example path
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -946,84 +813,76 @@ async def get_server_env_details() -> dict[str, Any]:
     return details
 
 
-@mcp.tool()
-async def request_server_shutdown() -> str:
-    """Requests the MCP server to shut down gracefully by calling sys.exit(0) after a delay."""
-    logger.info("Server shutdown requested. Scheduling sys.exit(0) after a short delay.")
+# Main entry point for Uvicorn or direct stdio run via script
+# Ref: https://fastmcp.numaru.com/usage/server-integration/#uvicorn-integration
+# Ref: https://fastmcp.numaru.com/usage/server-integration/#stdio-transport
 
-    loop = asyncio.get_event_loop()
 
-    async def do_shutdown_soon():
-        await asyncio.sleep(0.1)  # Ensure response is sent before exit
-        logger.info("Attempting to call sys.exit(0) via loop.call_soon_threadsafe.")
-        # Using call_soon_threadsafe is generally for calling from another thread,
-        # but it's a robust way to schedule something on the loop.
-        # For a single-threaded asyncio app, call_soon would also work.
-        # If mcp.run() runs its own loop or integrates differently, this might be safer.
-        loop.call_soon_threadsafe(sys.exit, 0)
-        # If sys.exit(0) from here doesn't work as expected with mcp.run(),
-        # we might need to explore mcp's internal signal handling if any, or rely on KeyboardInterrupt
-        # and fix the client side.
+def main() -> None:
+    """Runs the MCP server, choosing transport based on arguments."""
+    import argparse
 
-    asyncio.create_task(do_shutdown_soon())
+    # Argument parsing should be done first
+    parser = argparse.ArgumentParser(description="Log Analyzer MCP Server")
+    parser.add_argument(
+        "--transport",
+        type=str,
+        choices=["stdio", "http"],
+        default=os.getenv("MCP_DEFAULT_TRANSPORT", "stdio"),  # Default to stdio
+        help="Transport protocol to use: 'stdio' or 'http' (default: stdio or MCP_DEFAULT_TRANSPORT env var)",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=os.getenv("MCP_HTTP_HOST", "127.0.0.1"),
+        help="Host for HTTP transport (default: 127.0.0.1 or MCP_HTTP_HOST env var)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("MCP_HTTP_PORT", "8000")),
+        help="Port for HTTP transport (default: 8000 or MCP_HTTP_PORT env var)",
+    )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default=os.getenv("MCP_LOG_LEVEL", "info"),
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Logging level for Uvicorn (default: info or MCP_LOG_LEVEL env var)",
+    )
+    args = parser.parse_args()
 
-    return "Shutdown initiated (sys.exit(0) scheduled). Server should terminate shortly."
+    # Uses the global mcp instance and logger already configured at module level.
+    # logger.info("Logger for main() using global instance.") # Optional: confirm logger usage
+
+    if args.transport == "stdio":
+        logger.info("Starting Log Analyzer MCP server in stdio mode via main().")
+        mcp.run(transport="stdio")  # FastMCP handles stdio internally
+    elif args.transport == "http":
+        # Only import uvicorn and ASGIApplication if http transport is selected
+        try:
+            import uvicorn
+            from asgiref.typing import ASGIApplication  # For type hinting
+            from typing import cast
+        except ImportError as e:
+            logger.error("Required packages for HTTP transport (uvicorn, asgiref) are not installed. %s", e)
+            sys.exit(1)
+
+        logger.info(
+            "Starting Log Analyzer MCP server with Uvicorn on %s:%s (log_level: %s)",
+            args.host,
+            args.port,
+            args.log_level,
+        )
+        uvicorn.run(cast(ASGIApplication, mcp), host=args.host, port=args.port, log_level=args.log_level)
+    else:
+        # Should not happen due to choices in argparse, but as a fallback:
+        logger.error("Unsupported transport type: %s. Exiting.", args.transport)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    logger.info("Script started with Python %s", sys.version)
-    logger.info("Current working directory: %s", os.getcwd())
-    logger.info("Script directory: %s", script_dir)
-
-    try:
-        logger.info("Starting MCP server with FastMCP")
-        logger.debug("MCP transport: stdio")
-        logger.debug("MCP server name: log_analyzer")
-        # Manually listing known tools to avoid issues with mcp.tools attribute
-        # and the Pylint error "Attribute 'tools' is unknown".
-        known_tool_names = [
-            "analyze_tests",
-            "run_tests_no_verbosity",
-            "run_tests_verbose",
-            "run_tests_very_verbose",
-            "run_unit_test",
-            "ping",
-            "create_coverage_report",
-            "search_log_all_records",
-            "search_log_time_based",
-            "search_log_first_n_records",
-            "search_log_last_n_records",
-            "get_server_env_details",
-            "request_server_shutdown",
-        ]
-        logger.debug("Available tools (manually listed for logging): %s", ", ".join(known_tool_names))
-
-        # Monkey patch the FastMCP.run method to add more logging
-        original_run = mcp.run
-
-        def patched_run(*args, **kwargs):
-            logger.info("Entering patched FastMCP.run method")
-            transport = kwargs.get("transport", args[0] if args else "stdio")
-            logger.info("Using transport: %s", transport)
-
-            try:
-                logger.info("About to call original run method")
-                result = original_run(*args, **kwargs)
-                logger.info("Original run method completed")
-                return result
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error("Exception in FastMCP.run: %s", e)
-                logger.error("Traceback: %s", traceback.format_exc())
-                raise
-
-        # Assign the patched method
-        mcp.run = patched_run
-
-        # Run the server
-        logger.info("About to run MCP server")
-        mcp.run(transport="stdio")
-        logger.info("MCP server run completed")
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.critical("Critical error running MCP server: %s", e)
-        logger.critical("Traceback: %s", traceback.format_exc())
-        sys.exit(1)
+    # This block now directly calls main() to handle argument parsing and server start.
+    # This ensures consistency whether run as a script or via the entry point.
+    logger.info("Log Analyzer MCP Server script execution (__name__ == '__main__'). Calling main().")
+    main()

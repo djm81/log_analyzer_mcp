@@ -3,6 +3,20 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2025-06-01
+
+**Changed:**
+
+- Updated `README.md` with comprehensive sections for Installation, Configuration, Running the MCP Server, and Testing, including links to relevant detailed guides.
+- Revised `docs/getting_started.md` to align with `README.md` updates, improving clarity and navigation for new users.
+- Added placeholders and notes in documentation for upcoming/missing files: `docs/configuration.md`, `docs/cli_usage_guide.md`, and `.env.template`.
+
+## [0.1.6] - 2025-05-31
+
+**Added:**
+
+- Script entry point `log-analyzer-mcp` in `pyproject.toml` to allow execution of the MCP server via `uvx log-analyzer-mcp`.
+
 ## [0.1.5] - 2025-05-30
 
 **Added:**

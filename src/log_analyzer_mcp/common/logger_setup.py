@@ -181,7 +181,7 @@ class LoggerSetup:
     _active_loggers: Dict[str, logging.Logger] = {}
 
     @classmethod
-    def _clear_and_close_handlers(cls, logger: logging.Logger):
+    def _clear_and_close_handlers(cls, logger: logging.Logger) -> None:
         """Helper to clear and close all handlers for a given logger."""
         if logger.handlers:
             for handler in list(logger.handlers):  # Iterate over a copy
@@ -189,18 +189,27 @@ class LoggerSetup:
                     handler.flush()
                     is_default_stream = False
                     if isinstance(handler, logging.StreamHandler):
-                        stream = getattr(handler, "stream", None)  # Use getattr for safety
+                        stream = getattr(handler, "stream", None)
                         if stream is sys.stdout or stream is sys.stderr:
                             is_default_stream = True
-                            if stream is not None:
-                                if hasattr(stream, "fileno") and hasattr(sys.__stdout__, "fileno"):
-                                    if stream.fileno() != sys.__stdout__.fileno() and stream is sys.stdout:  # type: ignore[attr-defined]
+                            # Check stream is not None and has fileno before comparing
+                            if stream is not None and hasattr(stream, "fileno"):
+                                # Also check sys.__stdout__ and sys.__stderr__ for None and fileno for completeness
+                                if (
+                                    sys.__stdout__ is not None
+                                    and hasattr(sys.__stdout__, "fileno")
+                                    and stream is sys.stdout
+                                ):
+                                    if stream.fileno() != sys.__stdout__.fileno():
                                         is_default_stream = False
-                                if hasattr(stream, "fileno") and hasattr(sys.__stderr__, "fileno"):
-                                    if stream.fileno() != sys.__stderr__.fileno() and stream is sys.stderr:  # type: ignore[attr-defined]
+                                if (
+                                    sys.__stderr__ is not None
+                                    and hasattr(sys.__stderr__, "fileno")
+                                    and stream is sys.stderr
+                                ):
+                                    if stream.fileno() != sys.__stderr__.fileno():
                                         is_default_stream = False
 
-                    # Attempt to close if it has a close method and is not a default (non-file) stream handler
                     if hasattr(handler, "close"):
                         if not (is_default_stream and not isinstance(handler, logging.FileHandler)):
                             try:
@@ -208,9 +217,9 @@ class LoggerSetup:
                             except Exception:  # Broad catch for mocks or unusual states during close
                                 pass
                 except ValueError:
-                    pass
+                    pass  # Handler already closed or removed
                 except Exception as e:
-                    sys.stderr.write(f"Warning: Error during handler cleanup for {handler}: {e}\\n")
+                    sys.stderr.write(f"Warning: Error during handler cleanup for {handler}: {e}\n")
                 logger.removeHandler(handler)
 
     @classmethod
@@ -248,6 +257,7 @@ class LoggerSetup:
         """
         # Get log level from parameter, environment, or use default
         log_level_str = log_level or os.getenv("LOG_LEVEL", cls.DEFAULT_LOG_LEVEL)
+        assert isinstance(log_level_str, str)
         log_level_str = log_level_str.upper()
         log_level_num = getattr(logging, log_level_str, logging.INFO)
 
@@ -415,8 +425,8 @@ class LoggerSetup:
             handler.flush()
 
     @classmethod
-    def reset_loggers_for_testing(cls):
-        """Resets all loggers, closing their handlers. For test use only."""
+    def reset_loggers_for_testing(cls) -> None:
+        """Resets all known loggers by clearing their handlers. Useful for testing."""
         for logger_name in list(cls._active_loggers.keys()):
             logger = cls._active_loggers.pop(logger_name)
             cls._clear_and_close_handlers(logger)
