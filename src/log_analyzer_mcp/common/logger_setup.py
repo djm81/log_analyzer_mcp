@@ -34,16 +34,14 @@ def find_project_root(start_path: str, marker_file: str = "pyproject.toml") -> s
             return current_path
         parent_path = os.path.dirname(current_path)
         if parent_path == current_path:  # Reached filesystem root
-            # Fallback to a less reliable method if pyproject.toml not found
-            # This could happen if script is run from outside a typical project structure
-            # Default to 3 levels up from current file, similar to old logic but from __file__ directly
-            fallback_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            sys.stderr.write(f"Warning: '{marker_file}' not found. Falling back to project root: {fallback_root}\n")
-            return fallback_root
+            # If marker not found, CWD is the best guess for project root.
+            cwd = os.getcwd()
+            sys.stderr.write(f"Warning: '{marker_file}' not found from '{start_path}'. Falling back to CWD: {cwd}\\n")
+            return cwd
         current_path = parent_path
 
 
-PROJECT_ROOT = find_project_root(os.path.abspath(__file__))
+PROJECT_ROOT = find_project_root(os.getcwd())
 
 # Define the base logs directory at the project root
 LOGS_BASE_DIR = os.path.join(PROJECT_ROOT, "logs")
