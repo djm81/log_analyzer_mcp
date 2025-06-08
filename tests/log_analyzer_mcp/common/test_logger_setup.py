@@ -36,17 +36,8 @@ def test_find_project_root_fallback(tmp_path):
     # Instead, we'll check if it returns *a* path and doesn't crash.
     # A more robust test would involve creating a known deep structure without the marker.
 
-    # For now, let's test the fallback by starting from a path where it won't find the marker
-    # and ensure it returns a path based on the __file__ of the logger_setup module.
-    # This part is tricky to test perfectly without a complex setup.
-    # We can assert that it returns a path that is 3 levels up from logger_setup.py's location.
-
-    module_spec = sys.modules["log_analyzer_mcp.common.logger_setup"]
-    assert module_spec is not None, "Module spec should not be None"
-    module_file = module_spec.__file__
-    assert module_file is not None, "Module file path should not be None"
-    logger_setup_file_path = os.path.abspath(module_file)
-    expected_fallback_root = os.path.dirname(os.path.dirname(os.path.dirname(logger_setup_file_path)))
+    # The new fallback is os.getcwd(), so we can check against that.
+    expected_fallback_root = os.getcwd()
 
     # To simulate not finding it, we pass a non-existent marker and start path far from project
     # This forces it to go up to the filesystem root and trigger the fallback.
@@ -61,7 +52,7 @@ def test_find_project_root_fallback(tmp_path):
         # Use a marker that definitely won't exist to force fallback
         calculated_root = find_project_root(str(unrelated_deep_path), "THIS_MARKER_DOES_NOT_EXIST.txt")
 
-        # The fallback is 3 levels up from the *actual* logger_setup.py file
+        # The fallback is now os.getcwd()
         assert calculated_root == expected_fallback_root
         # Ensure os.path.exists was called multiple times during the upward search
         assert mock_exists.call_count > 1
