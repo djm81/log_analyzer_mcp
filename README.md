@@ -4,6 +4,10 @@
 [![codecov](https://codecov.io/gh/djm81/log_analyzer_mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/djm81/log_analyzer_mcp)
 [![PyPI - Version](https://img.shields.io/pypi/v/log-analyzer-mcp?color=blue)](https://pypi.org/project/log-analyzer-mcp)
 
+<a href="https://glama.ai/mcp/servers/@djm81/log_analyzer_mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@djm81/log_analyzer_mcp/badge" alt="Log Analyzer MCP server" />
+</a>
+
 ## Overview: Analyze Logs with Ease
 
 **Log Analyzer MCP** is a powerful Python-based toolkit designed to streamline the way you interact with log files. Whether you're debugging complex applications, monitoring test runs, or simply trying to make sense of verbose log outputs, this tool provides both a Command-Line Interface (CLI) and a Model-Context-Protocol (MCP) server to help you find the insights you need, quickly and efficiently.
